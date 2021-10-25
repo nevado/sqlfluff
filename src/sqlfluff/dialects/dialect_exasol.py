@@ -70,13 +70,10 @@ exasol_dialect.insert_lexer_matchers(
         ),
         RegexLexer(
             "function_script_terminator",
-            r";\s+(?!\*)\/(?!\*)|\s+(?!\*)\/(?!\*)",
+            r"\n/\n|\n/$",
             CodeSegment,
             segment_kwargs={"type": "function_script_terminator"},
-            subdivider=StringLexer(
-                "semicolon", ";", CodeSegment, segment_kwargs={"type": "semicolon"}
-            ),
-            trim_post_subdivide=RegexLexer(
+            subdivider=RegexLexer(
                 "newline",
                 r"(\n|\r\n)+",
                 NewlineSegment,
@@ -1019,14 +1016,18 @@ class CreateTableStatementSegment(BaseSegment):
             # Columns and comment syntax:
             Bracketed(
                 Sequence(
+                    Ref("TableContentDefinitionSegment"),
                     AnyNumberOf(
-                        Ref("ColumnDefinitionSegment"),
-                        Ref("TableOutOfLineConstraintSegment"),
-                        Ref("CreateTableLikeClauseSegment"),
-                        Ref("CommaSegment"),
-                        min_times=1,
+                        Sequence(
+                            Ref("CommaSegment"),
+                            Ref("TableContentDefinitionSegment"),
+                        ),
                     ),
-                    Ref("TableDistributionPartitonClause", optional=True),
+                    Sequence(
+                        Ref("CommaSegment"),
+                        Ref("TableDistributionPartitonClause"),
+                        optional=True,
+                    ),
                 ),
             ),
             # Create AS syntax:
@@ -1047,6 +1048,18 @@ class CreateTableStatementSegment(BaseSegment):
             Ref("CreateTableLikeClauseSegment"),
         ),
         Ref("CommentIsGrammar", optional=True),
+    )
+
+
+@exasol_dialect.segment()
+class TableContentDefinitionSegment(BaseSegment):
+    """The table content definition."""
+
+    type = "table_content_definition"
+    match_grammar = OneOf(
+        Ref("ColumnDefinitionSegment"),
+        Ref("TableOutOfLineConstraintSegment"),
+        Ref("CreateTableLikeClauseSegment"),
     )
 
 
@@ -1321,7 +1334,7 @@ class TableDistributionPartitonClause(BaseSegment):
 class AlterTableStatementSegment(BaseSegment):
     """`ALTER TABLE` statement."""
 
-    type = "alter_table_statment"
+    type = "alter_table_statement"
 
     is_ddl = True
     is_dml = False
@@ -1342,7 +1355,7 @@ class AlterTableColumnSegment(BaseSegment):
     https://docs.exasol.com/sql/alter_table(column).htm
     """
 
-    type = "alter_table_statement"
+    type = "alter_table_column_statement"
 
     is_ddl = True
     is_dml = False
@@ -1456,7 +1469,7 @@ class AlterTableConstraintSegment(BaseSegment):
     https://docs.exasol.com/sql/alter_table(constraints).htm
     """
 
-    type = "alter_table_statement"
+    type = "alter_table_constraint_statement"
 
     is_ddl = True
     is_dml = False
@@ -1506,7 +1519,7 @@ class AlterTableDistributePartitionSegment(BaseSegment):
     https://docs.exasol.com/sql/alter_table(distribution_partitioning).htm
     """
 
-    type = "alter_table_statement"
+    type = "alter_table_distribute_partition_statement"
 
     is_ddl = True
     is_dml = False
@@ -3619,6 +3632,7 @@ class CreateAdapterScriptStatementSegment(BaseSegment):
         "ADAPTER",
         "SCRIPT",
         Ref("ScriptReferenceSegment"),
+        "AS",
         Indent,
         Ref("ScriptContentSegment"),
         Dedent,

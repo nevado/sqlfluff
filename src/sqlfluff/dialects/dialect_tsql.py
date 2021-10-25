@@ -25,6 +25,7 @@ from sqlfluff.core.parser import (
     CommentSegment,
     StringParser,
     SymbolSegment,
+    SegmentGenerator,
 )
 
 from sqlfluff.core.dialects import load_raw_dialect
@@ -52,11 +53,11 @@ tsql_dialect.insert_lexer_matchers(
         ),
         RegexLexer(
             "square_quote",
-            r"\[([a-zA-Z0-9][^\[\]]*)*\]",
+            r"\[([^\[\]]*)*\]",
             CodeSegment,
         ),
         # T-SQL unicode strings
-        RegexLexer("single_quote_with_n", r"N'([^'\\]|\\.)*'", CodeSegment),
+        RegexLexer("single_quote_with_n", r"N'([^']|'')*'", CodeSegment),
         RegexLexer(
             "hash_prefix",
             r"[#][#]?[a-zA-Z0-9_]+",
@@ -68,6 +69,8 @@ tsql_dialect.insert_lexer_matchers(
 
 tsql_dialect.patch_lexer_matchers(
     [
+        # Patching single_quote to allow for TSQL-style escaped quotes
+        RegexLexer("single_quote", r"'([^']|'')*'", CodeSegment),
         # Patching comments to remove hash comments
         RegexLexer(
             "inline_comment",
@@ -78,6 +81,9 @@ tsql_dialect.patch_lexer_matchers(
         # Patching to add !<, !>
         RegexLexer("greater_than_or_equal", ">=|!<", CodeSegment),
         RegexLexer("less_than_or_equal", "<=|!>", CodeSegment),
+        RegexLexer(
+            "code", r"[0-9a-zA-Z_#@]+", CodeSegment
+        ),  # overriding to allow hash mark and at-sign in code
     ]
 )
 
@@ -101,6 +107,18 @@ tsql_dialect.add(
 )
 
 tsql_dialect.replace(
+    # Overriding to cover TSQL allowed identifier name characters
+    # https://docs.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers?view=sql-server-ver15
+    NakedIdentifierSegment=SegmentGenerator(
+        # Generate the anti template from the set of reserved keywords
+        lambda dialect: RegexParser(
+            r"[A-Z_][A-Z0-9_@$#]*",
+            CodeSegment,
+            name="naked_identifier",
+            type="identifier",
+            anti_template=r"^(" + r"|".join(dialect.sets("reserved_keywords")) + r")$",
+        )
+    ),
     ComparisonOperatorGrammar=OneOf(
         Ref("EqualsSegment"),
         Ref("GreaterThanSegment"),
@@ -173,7 +191,63 @@ tsql_dialect.replace(
         Ref("DelimiterSegment"),
     ),
     JoinKeywords=OneOf("JOIN", "APPLY", Sequence("OUTER", "APPLY")),
+    # Replace Expression_D_Grammar to remove casting syntax invalid in TSQL
+    Expression_D_Grammar=Sequence(
+        OneOf(
+            Ref("BareFunctionSegment"),
+            Ref("FunctionSegment"),
+            Bracketed(
+                OneOf(
+                    # We're using the expression segment here rather than the grammar so
+                    # that in the parsed structure we get nested elements.
+                    Ref("ExpressionSegment"),
+                    Ref("SelectableGrammar"),
+                    Delimited(
+                        Ref(
+                            "ColumnReferenceSegment"
+                        ),  # WHERE (a,b,c) IN (select a,b,c FROM...)
+                        Ref(
+                            "FunctionSegment"
+                        ),  # WHERE (a, substr(b,1,3)) IN (select c,d FROM...)
+                        Ref("LiteralGrammar"),  # WHERE (a, 2) IN (SELECT b, c FROM ...)
+                    ),
+                    ephemeral_name="BracketedExpression",
+                ),
+            ),
+            # Allow potential select statement without brackets
+            Ref("SelectStatementSegment"),
+            Ref("LiteralGrammar"),
+            Ref("IntervalExpressionSegment"),
+            Ref("ColumnReferenceSegment"),
+            Sequence(
+                Ref("SimpleArrayTypeGrammar", optional=True), Ref("ArrayLiteralSegment")
+            ),
+        ),
+        Ref("Accessor_Grammar", optional=True),
+        allow_gaps=True,
+    ),
 )
+
+
+@tsql_dialect.segment(replace=True)
+class AliasExpressionSegment(BaseSegment):
+    """A reference to an object with an `AS` clause.
+
+    The optional AS keyword allows both implicit and explicit aliasing.
+    Overriding ANSI to remove QuotedLiteralSegment
+    """
+
+    type = "alias_expression"
+    match_grammar = Sequence(
+        Ref.keyword("AS", optional=True),
+        OneOf(
+            Sequence(
+                Ref("SingleIdentifierGrammar"),
+                # Column alias in VALUES clause
+                Bracketed(Ref("SingleIdentifierListSegment"), optional=True),
+            ),
+        ),
+    )
 
 
 @tsql_dialect.segment(replace=True)
@@ -191,6 +265,9 @@ class StatementSegment(ansi_dialect.get_segment("StatementSegment")):  # type: i
                 "CreateTableAsSelectStatementSegment"
             ),  # Azure Synapse Analytics specific
             Ref("RenameStatementSegment"),  # Azure Synapse Analytics specific
+            Ref("ExecuteScriptSegment"),
+            Ref("DropStatisticsStatementSegment"),
+            Ref("UpdateStatisticsStatementSegment"),
         ],
     )
 
@@ -262,6 +339,7 @@ class UnorderedSelectStatementSegment(BaseSegment):
         # Dedent for the indent in the select clause.
         # It's here so that it can come AFTER any whitespace.
         Dedent,
+        Ref("IntoTableSegment", optional=True),
         Ref("FromClauseSegment", optional=True),
         Ref("PivotUnpivotStatementSegment", optional=True),
         Ref("WhereClauseSegment", optional=True),
@@ -291,6 +369,17 @@ class SelectStatementSegment(BaseSegment):
             Ref("DelimiterSegment", optional=True),
         ]
     )
+
+
+@tsql_dialect.segment()
+class IntoTableSegment(BaseSegment):
+    """`INTO` clause within `SELECT`.
+
+    https://docs.microsoft.com/en-us/sql/t-sql/queries/select-into-clause-transact-sql?view=sql-server-ver15
+    """
+
+    type = "into_table_clause"
+    match_grammar = Sequence("INTO", Ref("ObjectReferenceSegment"))
 
 
 @tsql_dialect.segment(replace=True)
@@ -345,6 +434,64 @@ class CreateIndexStatementSegment(BaseSegment):
                         Ref("IndexColumnDefinitionSegment"),
                     ),
                 )
+            ),
+            optional=True,
+        ),
+        Ref("DelimiterSegment", optional=True),
+    )
+
+
+@tsql_dialect.segment(replace=True)
+class DropIndexStatementSegment(BaseSegment):
+    """A `DROP INDEX` statement.
+
+    Overriding ANSI to include required ON clause.
+    """
+
+    type = "drop_statement"
+    match_grammar = Sequence(
+        "DROP",
+        "INDEX",
+        Ref("IfExistsGrammar", optional=True),
+        Ref("IndexReferenceSegment"),
+        "ON",
+        Ref("TableReferenceSegment"),
+        Ref("DelimiterSegment", optional=True),
+    )
+
+
+@tsql_dialect.segment()
+class DropStatisticsStatementSegment(BaseSegment):
+    """A `DROP STATISTICS` statement."""
+
+    type = "drop_statement"
+    # DROP INDEX <Index name> [CONCURRENTLY] [IF EXISTS] {RESTRICT | CASCADE}
+    match_grammar = Sequence(
+        "DROP",
+        OneOf("STATISTICS"),
+        Ref("IndexReferenceSegment"),
+        Ref("DelimiterSegment", optional=True),
+    )
+
+
+@tsql_dialect.segment()
+class UpdateStatisticsStatementSegment(BaseSegment):
+    """An `UPDATE STATISTICS` statement.
+
+    https://docs.microsoft.com/en-us/sql/t-sql/statements/update-statistics-transact-sql?view=sql-server-ver15
+    """
+
+    type = "update_statistics_statement"
+    match_grammar = Sequence(
+        "UPDATE",
+        "STATISTICS",
+        Ref("ObjectReferenceSegment"),
+        OneOf(
+            Ref("SingleIdentifierGrammar"),
+            Bracketed(
+                Delimited(
+                    Ref("SingleIdentifierGrammar"),
+                ),
             ),
             optional=True,
         ),
@@ -531,6 +678,7 @@ class DeclareStatementSegment(BaseSegment):
     match_grammar = Sequence(
         "DECLARE",
         Ref("ParameterNameSegment"),
+        Sequence("AS", optional=True),
         Ref("DatatypeSegment"),
         Sequence(
             Ref("EqualsSegment"),
@@ -808,6 +956,7 @@ class SetStatementSegment(BaseSegment):
                 Ref("ExpressionSegment"),
             ),
         ),
+        Ref("DelimiterSegment", optional=True),
     )
 
 
@@ -961,6 +1110,18 @@ class CastFunctionNameSegment(BaseSegment):
 
 
 @tsql_dialect.segment()
+class RankFunctionNameSegment(BaseSegment):
+    """Rank function name segment.
+
+    Need to be able to specify this as type function_name
+    so that linting rules identify it properly
+    """
+
+    type = "function_name"
+    match_grammar = OneOf("DENSE_RANK", "NTILE", "RANK", "ROW_NUMBER")
+
+
+@tsql_dialect.segment()
 class WithinGroupFunctionNameSegment(BaseSegment):
     """WITHIN GROUP function name segment.
 
@@ -1033,83 +1194,85 @@ class FunctionSegment(BaseSegment):
     type = "function"
     match_grammar = OneOf(
         Sequence(
-            Sequence(
-                Ref("DatePartFunctionNameSegment"),
-                Bracketed(
-                    Delimited(
-                        Ref("DatePartClause"),
-                        Ref(
-                            "FunctionContentsGrammar",
-                            # The brackets might be empty for some functions...
-                            optional=True,
-                            ephemeral_name="FunctionContentsGrammar",
-                        ),
-                    )
-                ),
-            )
-        ),
-        Sequence(
-            Sequence(
-                Ref("ConvertFunctionNameSegment"),
-                Bracketed(
-                    Delimited(
-                        Ref("DatatypeSegment"),
-                        Ref(
-                            "FunctionContentsGrammar",
-                            # The brackets might be empty for some functions...
-                            optional=True,
-                            ephemeral_name="FunctionContentsGrammar",
-                        ),
-                    )
-                ),
-            )
-        ),
-        Sequence(
-            Sequence(
-                Ref("CastFunctionNameSegment"),
-                Bracketed(
-                    Ref("ExpressionSegment"),
-                    "AS",
-                    Ref("DatatypeSegment"),
-                ),
-            ),
-        ),
-        Sequence(
-            Sequence(
-                Ref("WithinGroupFunctionNameSegment"),
-                Bracketed(
-                    Delimited(
-                        Ref(
-                            "FunctionContentsGrammar",
-                            # The brackets might be empty for some functions...
-                            optional=True,
-                            ephemeral_name="FunctionContentsGrammar",
-                        ),
-                    ),
-                ),
-                Ref("WithinGroupClause", optional=True),
-            )
-        ),
-        Sequence(
-            Sequence(
-                OneOf(
-                    Ref("FunctionNameSegment"),
-                    exclude=OneOf(
-                        # List of special functions handled differently
-                        Ref("CastFunctionNameSegment"),
-                        Ref("ConvertFunctionNameSegment"),
-                        Ref("DatePartFunctionNameSegment"),
-                        Ref("WithinGroupFunctionNameSegment"),
-                    ),
-                ),
-                Bracketed(
+            Ref("DatePartFunctionNameSegment"),
+            Bracketed(
+                Delimited(
+                    Ref("DatePartClause"),
                     Ref(
                         "FunctionContentsGrammar",
                         # The brackets might be empty for some functions...
                         optional=True,
                         ephemeral_name="FunctionContentsGrammar",
-                    )
+                    ),
+                )
+            ),
+        ),
+        Sequence(
+            Ref("RankFunctionNameSegment"),
+            Bracketed(
+                Ref("NumericLiteralSegment", optional=True),
+            ),
+            "OVER",
+            Bracketed(
+                Ref("PartitionByClause", optional=True),
+                Ref("OrderByClauseSegment"),
+            ),
+        ),
+        Sequence(
+            Ref("ConvertFunctionNameSegment"),
+            Bracketed(
+                Delimited(
+                    Ref("DatatypeSegment"),
+                    Ref(
+                        "FunctionContentsGrammar",
+                        # The brackets might be empty for some functions...
+                        optional=True,
+                        ephemeral_name="FunctionContentsGrammar",
+                    ),
+                )
+            ),
+        ),
+        Sequence(
+            Ref("CastFunctionNameSegment"),
+            Bracketed(
+                Ref("ExpressionSegment"),
+                "AS",
+                Ref("DatatypeSegment"),
+            ),
+        ),
+        Sequence(
+            Ref("WithinGroupFunctionNameSegment"),
+            Bracketed(
+                Delimited(
+                    Ref(
+                        "FunctionContentsGrammar",
+                        # The brackets might be empty for some functions...
+                        optional=True,
+                        ephemeral_name="FunctionContentsGrammar",
+                    ),
                 ),
+            ),
+            Ref("WithinGroupClause", optional=True),
+        ),
+        Sequence(
+            OneOf(
+                Ref("FunctionNameSegment"),
+                exclude=OneOf(
+                    # List of special functions handled differently
+                    Ref("CastFunctionNameSegment"),
+                    Ref("ConvertFunctionNameSegment"),
+                    Ref("DatePartFunctionNameSegment"),
+                    Ref("WithinGroupFunctionNameSegment"),
+                    Ref("RankFunctionNameSegment"),
+                ),
+            ),
+            Bracketed(
+                Ref(
+                    "FunctionContentsGrammar",
+                    # The brackets might be empty for some functions...
+                    optional=True,
+                    ephemeral_name="FunctionContentsGrammar",
+                )
             ),
             Ref("PostFunctionGrammar", optional=True),
         ),
@@ -1184,20 +1347,11 @@ class TableDistributionIndexClause(BaseSegment):
     match_grammar = Sequence(
         "WITH",
         Bracketed(
-            OneOf(
-                Sequence(
-                    Ref("TableDistributionClause"),
-                    Ref("CommaSegment"),
-                    Ref("TableIndexClause"),
-                ),
-                Sequence(
-                    Ref("TableIndexClause"),
-                    Ref("CommaSegment"),
-                    Ref("TableDistributionClause"),
-                ),
+            Delimited(
                 Ref("TableDistributionClause"),
                 Ref("TableIndexClause"),
-            )
+                Ref("TableLocationClause"),
+            ),
         ),
     )
 
@@ -1247,6 +1401,25 @@ class TableIndexClause(BaseSegment):
 
 
 @tsql_dialect.segment()
+class TableLocationClause(BaseSegment):
+    """`CREATE TABLE` location clause.
+
+    This is specific to Azure Synapse Analytics (deprecated) or to an external table.
+    """
+
+    type = "table_location_clause"
+
+    match_grammar = Sequence(
+        "LOCATION",
+        Ref("EqualsSegment"),
+        OneOf(
+            "USER_DB",  # Azure Synapse Analytics specific
+            Ref("QuotedLiteralSegment"),  # External Table
+        ),
+    )
+
+
+@tsql_dialect.segment()
 class AlterTableSwitchStatementSegment(BaseSegment):
     """An `ALTER TABLE SWITCH` statement."""
 
@@ -1285,7 +1458,8 @@ class CreateTableAsSelectStatementSegment(BaseSegment):
         Ref("TableReferenceSegment"),
         Ref("TableDistributionIndexClause"),
         "AS",
-        Ref("SelectableGrammar"),
+        OptionallyBracketed(Ref("SelectableGrammar")),
+        Ref("OptionClauseSegment", optional=True),
         Ref("DelimiterSegment", optional=True),
     )
 
@@ -1373,6 +1547,7 @@ class BeginEndSegment(BaseSegment):
     type = "begin_end_block"
     match_grammar = Sequence(
         "BEGIN",
+        Ref("DelimiterSegment", optional=True),
         Indent,
         AnyNumberOf(
             OneOf(
@@ -1517,6 +1692,22 @@ class GroupByClauseSegment(BaseSegment):
 
 
 @tsql_dialect.segment(replace=True)
+class HavingClauseSegment(BaseSegment):
+    """A `HAVING` clause like in `SELECT`.
+
+    Overriding ANSI to remove StartsWith with greedy terminator
+    """
+
+    type = "having_clause"
+    match_grammar = Sequence(
+        "HAVING",
+        Indent,
+        OptionallyBracketed(Ref("ExpressionSegment")),
+        Dedent,
+    )
+
+
+@tsql_dialect.segment(replace=True)
 class OrderByClauseSegment(BaseSegment):
     """A `ORDER BY` clause like in `SELECT`.
 
@@ -1555,8 +1746,6 @@ class OrderByClauseSegment(BaseSegment):
         ),
         Dedent,
     )
-
-    parse_grammar = None
 
 
 @tsql_dialect.segment()
@@ -1902,5 +2091,45 @@ class SetExpressionSegment(BaseSegment):
         ),
         Ref("OrderByClauseSegment", optional=True),
         Ref("OptionClauseSegment", optional=True),
+        Ref("DelimiterSegment", optional=True),
+    )
+
+
+@tsql_dialect.segment()
+class ExecuteScriptSegment(BaseSegment):
+    """`EXECUTE` statement.
+
+    Matching segment name and type from exasol.
+    https://docs.microsoft.com/en-us/sql/t-sql/language-elements/execute-transact-sql?view=sql-server-ver15
+    """
+
+    type = "execute_script_statement"
+    match_grammar = Sequence(
+        OneOf("EXEC", "EXECUTE"),
+        Ref("ObjectReferenceSegment"),
+        Sequence(
+            Sequence(Ref("ParameterNameSegment"), Ref("EqualsSegment"), optional=True),
+            OneOf(
+                "DEFAULT",
+                Ref("LiteralGrammar"),
+                Ref("ParameterNameSegment"),
+                Ref("SingleIdentifierGrammar"),
+            ),
+            Sequence("OUTPUT", optional=True),
+            AnyNumberOf(
+                Ref("CommaSegment"),
+                Sequence(
+                    Ref("ParameterNameSegment"), Ref("EqualsSegment"), optional=True
+                ),
+                OneOf(
+                    "DEFAULT",
+                    Ref("LiteralGrammar"),
+                    Ref("ParameterNameSegment"),
+                    Ref("SingleIdentifierGrammar"),
+                ),
+                Sequence("OUTPUT", optional=True),
+            ),
+            optional=True,
+        ),
         Ref("DelimiterSegment", optional=True),
     )

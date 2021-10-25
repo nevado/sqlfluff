@@ -281,6 +281,7 @@ UNRESERVED_KEYWORDS = [
     "NOEXPAND",
     "NOLOCK",
     "NS",
+    "NTILE",
     "PAGLOCK",
     "PARAMETERIZATION",
     "Q",
@@ -308,6 +309,7 @@ UNRESERVED_KEYWORDS = [
     "TABLOCKX",
     "TRUNCATE_TARGET",  # Azure Synapse Analytics specific
     "UPDLOCK",
+    "USER_DB",  # Azure Synapse Analytics specific, deprecated
     "W",
     "WEEK",
     "WEEKDAY",
