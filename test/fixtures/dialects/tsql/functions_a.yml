@@ -3,9 +3,9 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: 252a3ff7798b62db9d272e79c7651940dc7c78d01d9b12d4a373791856ce0b7f
+_hash: 46eeedeef9a1e84458eb58a4d365b4704e5e09effc6f6acff829e2548e01a50a
 file:
-  batch:
+- batch:
     statement:
       select_statement:
         select_clause:
@@ -81,11 +81,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEADD
+                function_name_identifier: DATEADD
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: month
+              - date_part: month
               - comma: ','
               - expression:
                   numeric_literal:
@@ -107,15 +106,15 @@ file:
               bracketed:
               - start_bracket: (
               - data_type:
-                  identifier: varchar
-              - comma: ','
-              - data_type:
-                - identifier: tbl_b
-                - dot: .
-                - identifier: column1
+                  data_type_identifier: varchar
               - comma: ','
               - expression:
-                  literal: '23'
+                  column_reference:
+                  - identifier: tbl_b
+                  - dot: .
+                  - identifier: column1
+              - comma: ','
+              - literal: '23'
               - end_bracket: )
             alias_expression:
               keyword: AS
@@ -127,3 +126,78 @@ file:
               table_expression:
                 table_reference:
                   identifier: tbl_b
+- go_statement:
+    keyword: GO
+- batch:
+    statement:
+      create_function_statement:
+      - keyword: CREATE
+      - keyword: FUNCTION
+      - object_reference:
+        - identifier: dbo
+        - dot: .
+        - identifier: RandDate
+      - function_parameter_list:
+          bracketed:
+            start_bracket: (
+            parameter: '@admit'
+            data_type:
+              data_type_identifier: DATE
+            end_bracket: )
+      - keyword: RETURNS
+      - keyword: TABLE
+      - keyword: AS
+      - procedure_statement:
+          statement:
+            return_segment:
+              keyword: RETURN
+              expression:
+                bracketed:
+                  start_bracket: (
+                  expression:
+                    select_statement:
+                      select_clause:
+                        keyword: SELECT
+                        select_clause_element:
+                          parameter: '@admit'
+                      from_clause:
+                        keyword: FROM
+                        from_expression:
+                          from_expression_element:
+                            table_expression:
+                              table_reference:
+                              - identifier: dbo
+                              - dot: .
+                              - identifier: '[RandomDate]'
+                  end_bracket: )
+              statement_terminator: ;
+- go_statement:
+    keyword: GO
+- batch:
+    statement:
+      create_function_statement:
+      - keyword: CREATE
+      - keyword: FUNCTION
+      - object_reference:
+        - identifier: dbo
+        - dot: .
+        - identifier: no_paramters
+      - function_parameter_list:
+          bracketed:
+            start_bracket: (
+            end_bracket: )
+      - keyword: RETURNS
+      - data_type:
+          data_type_identifier: INT
+      - keyword: AS
+      - procedure_statement:
+          statement:
+            begin_end_block:
+            - keyword: BEGIN
+            - statement:
+                return_segment:
+                  keyword: RETURN
+                  expression:
+                    literal: '2'
+                  statement_terminator: ;
+            - keyword: END

@@ -26,6 +26,7 @@ from sqlfluff.core.parser import (
 )
 
 from sqlfluff.core.dialects import load_raw_dialect
+from sqlfluff.dialects import dialect_ansi as ansi
 
 ansi_dialect = load_raw_dialect("ansi")
 teradata_dialect = ansi_dialect.copy_as("teradata")
@@ -76,6 +77,7 @@ teradata_dialect.sets("unreserved_keywords").update(
         "QUIT",
         "RUN",
         "SAMPLE",
+        "SEL",
         "STAT",
         "SUMMARY",
         "THRESHOLD",
@@ -90,7 +92,6 @@ teradata_dialect.sets("bare_functions").update(["DATE"])
 
 
 # BTEQ statement
-@teradata_dialect.segment()
 class BteqKeyWordSegment(BaseSegment):
     """Bteq Keywords.
 
@@ -131,7 +132,6 @@ class BteqKeyWordSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class BteqStatementSegment(BaseSegment):
     """Bteq statements start with a dot, followed by a Keyword.
 
@@ -158,7 +158,6 @@ class BteqStatementSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class TdCollectStatUsingOptionClauseSegment(BaseSegment):
     """'using_option' for COLLECT STAT clause."""
 
@@ -186,7 +185,6 @@ class TdCollectStatUsingOptionClauseSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class TdOrderByStatClauseSegment(BaseSegment):
     """An `ORDER BY (VALUES|HASH) (column_name)` clause in COLLECT STATS."""
 
@@ -197,12 +195,12 @@ class TdOrderByStatClauseSegment(BaseSegment):
 
 
 # Collect Statistics statement
-@teradata_dialect.segment()
 class TdCollectStatisticsStatementSegment(BaseSegment):
     """A `COLLECT STATISTICS (Optimizer Form)` statement.
 
     # TODO: add expression
-    COLLECT [SUMMARY] (STATISTICS|STAT) [[COLUMN| [UNIQUE] INDEX] (expression (, expression ...)] ON TABLENAME
+    COLLECT [SUMMARY] (STATISTICS|STAT) [[COLUMN| [UNIQUE] INDEX]
+    (expression (, expression ...)] ON TABLENAME
     """
 
     type = "collect_statistics_statement"
@@ -220,7 +218,8 @@ class TdCollectStatisticsStatementSegment(BaseSegment):
         ),
         Delimited(
             OneOf(
-                # UNIQUE INDEX index_name ALL (column_name, ...) ORDER BY VALUES|HASH (column_name)
+                # UNIQUE INDEX index_name ALL (column_name, ...) ORDER BY VALUES|HASH
+                # (column_name)
                 Sequence(
                     Ref.keyword("UNIQUE", optional=True),
                     "INDEX",
@@ -268,12 +267,12 @@ class TdCollectStatisticsStatementSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class TdCommentStatementSegment(BaseSegment):
     """A `COMMENT` statement.
 
     COMMENT [ON] (object_kind_1|object_kind_2) name [[AS|IS] comment]
-    object_kind_1: (COLUMN|FUNCTION|GLOP SET|MACRO|MAP|METHOD|PROCEDURE|PROFILE|ROLE|TRIGGER|TYPE|VIEW)
+    object_kind_1: (COLUMN|FUNCTION|GLOP SET|MACRO|MAP|METHOD|PROCEDURE|PROFILE|ROLE|
+                    TRIGGER|TYPE|VIEW)
     object_kind_2: (DATABASE|FILE|TABLE|USER)
     """
 
@@ -312,7 +311,6 @@ class TdCommentStatementSegment(BaseSegment):
 
 
 # Rename table statement
-@teradata_dialect.segment()
 class TdRenameStatementSegment(BaseSegment):
     """A `RENAME TABLE` statement.
 
@@ -334,14 +332,12 @@ class TdRenameStatementSegment(BaseSegment):
 
 
 # Adding Teradata specific DATE FORMAT 'YYYYMM'
-@teradata_dialect.segment(replace=True)
-class DatatypeSegment(BaseSegment):
+class DatatypeSegment(ansi.DatatypeSegment):
     """A data type segment.
 
     DATE FORMAT 'YYYY-MM-DD'
     """
 
-    type = "td_internal_data_type"
     match_grammar = Sequence(
         Ref("DatatypeIdentifierSegment"),
         Bracketed(
@@ -359,7 +355,6 @@ class DatatypeSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class TeradataCastSegment(BaseSegment):
     """A casting operation using Teradata conversion syntax.
 
@@ -383,7 +378,6 @@ class TeradataCastSegment(BaseSegment):
     match_grammar = Bracketed(Ref("DatatypeSegment"))
 
 
-@teradata_dialect.segment(replace=True)
 class ExpressionSegment(BaseSegment):
     """A expression, either arithmetic or boolean.
 
@@ -399,7 +393,6 @@ class ExpressionSegment(BaseSegment):
 
 
 # Adding Teradata specific column definitions
-@teradata_dialect.segment(replace=True)
 class ColumnDefinitionSegment(BaseSegment):
     """A column definition, e.g. for CREATE TABLE or ALTER TABLE."""
 
@@ -416,7 +409,6 @@ class ColumnDefinitionSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class TdColumnConstraintSegment(BaseSegment):
     """Teradata specific column attributes.
 
@@ -450,17 +442,17 @@ class TdColumnConstraintSegment(BaseSegment):
 
 
 # Create Teradata Create Table Statement
-@teradata_dialect.segment()
 class TdCreateTableOptions(BaseSegment):
     """CreateTableOptions.
 
-    , NO FALLBACK, NO BEFORE JOURNAL, NO AFTER JOURNAL, CHECKSUM = DEFAULT, DEFAULT MERGEBLOCKRATIO
+    , NO FALLBACK, NO BEFORE JOURNAL, NO AFTER JOURNAL, CHECKSUM = DEFAULT
+    , DEFAULT MERGEBLOCKRATIO
     """
 
     type = "create_table_options_statement"
-    match_grammar = AnyNumberOf(
-        Sequence(
-            Ref("CommaSegment"),
+    match_grammar = Sequence(
+        Ref("CommaSegment"),
+        Delimited(
             OneOf(
                 # [ NO ] FALLBACK [ PROTECTION ]
                 Sequence(
@@ -506,7 +498,6 @@ class TdCreateTableOptions(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class TdTablePartitioningLevel(BaseSegment):
     """Partitioning Level.
 
@@ -517,7 +508,8 @@ class TdTablePartitioningLevel(BaseSegment):
 
     column_partition := ([COLUMN|ROW] column_name (, column_name2, ...) NO AUTOCOMPRESS
 
-    partition_expression := CASE_N, RANGE_N, EXTRACT, expression and in case of multi-level in parenthesis
+    partition_expression := CASE_N, RANGE_N, EXTRACT, expression and in case of
+    multi-level in parenthesis
     """
 
     type = "td_partitioning_level"
@@ -538,7 +530,6 @@ class TdTablePartitioningLevel(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class TdTableConstraints(BaseSegment):
     """Teradata specific table attributes.
 
@@ -592,7 +583,6 @@ class TdTableConstraints(BaseSegment):
     )
 
 
-@teradata_dialect.segment(replace=True)
 class CreateTableStatementSegment(BaseSegment):
     """A `CREATE [MULTISET| SET] TABLE` statement."""
 
@@ -607,7 +597,7 @@ class CreateTableStatementSegment(BaseSegment):
         Sequence("IF", "NOT", "EXISTS", optional=True),
         Ref("TableReferenceSegment"),
         # , NO FALLBACK, NO BEFORE JOURNAL, NO AFTER JOURNAL
-        OneOf(Ref("TdCreateTableOptions"), optional=True),
+        Ref("TdCreateTableOptions", optional=True),
         OneOf(
             # Columns and comment syntax:
             Sequence(
@@ -633,7 +623,6 @@ class CreateTableStatementSegment(BaseSegment):
 
 
 # Update
-@teradata_dialect.segment(replace=True)
 class UpdateStatementSegment(BaseSegment):
     """A `Update from` statement.
 
@@ -645,8 +634,7 @@ class UpdateStatementSegment(BaseSegment):
     """
 
     type = "update_statement"
-    match_grammar = StartsWith("UPDATE")
-    parse_grammar = Sequence(
+    match_grammar = Sequence(
         "UPDATE",
         OneOf(
             Ref("TableReferenceSegment"),
@@ -661,7 +649,6 @@ class UpdateStatementSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment()
 class FromUpdateClauseSegment(BaseSegment):
     """A `FROM` clause like in `SELECT` but terminated by SET."""
 
@@ -678,13 +665,12 @@ class FromUpdateClauseSegment(BaseSegment):
 
 
 # Adding Teradata specific statements
-@teradata_dialect.segment(replace=True)
-class StatementSegment(BaseSegment):
+class StatementSegment(ansi.StatementSegment):
     """A generic segment, to any of its child subsegments."""
 
     type = "statement"
 
-    parse_grammar = ansi_dialect.get_segment("StatementSegment").parse_grammar.copy(
+    parse_grammar = ansi.StatementSegment.parse_grammar.copy(
         insert=[
             Ref("TdCollectStatisticsStatementSegment"),
             Ref("BteqStatementSegment"),
@@ -694,11 +680,11 @@ class StatementSegment(BaseSegment):
         ],
     )
 
-    match_grammar = ansi_dialect.get_segment("StatementSegment").match_grammar.copy()
+    match_grammar = ansi.StatementSegment.match_grammar.copy()
 
 
 teradata_dialect.add(
-    TdCastIdentifierSegment=Sequence(
+    TdCastIdentifierGrammar=Sequence(
         OneOf("DATE", "TIMESTAMP"), Ref("ExpressionSegment")
     ),
 )
@@ -707,12 +693,20 @@ teradata_dialect.replace(
     SingleIdentifierGrammar=OneOf(
         Ref("NakedIdentifierSegment"),
         Ref("QuotedIdentifierSegment"),
-        Ref("TdCastIdentifierSegment"),
-    )
+        Ref("TdCastIdentifierGrammar"),
+    ),
+    SelectClauseSegmentGrammar=Sequence(
+        OneOf("SELECT", "SEL"),
+        Ref("SelectClauseModifierSegment", optional=True),
+        Indent,
+        Delimited(
+            Ref("SelectClauseElementSegment"),
+            allow_trailing=True,
+        ),
+    ),
 )
 
 
-@teradata_dialect.segment()
 class QualifyClauseSegment(BaseSegment):
     """A `QUALIFY` clause like in `SELECT`."""
 
@@ -730,51 +724,37 @@ class QualifyClauseSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment(replace=True)
-class SelectStatementSegment(BaseSegment):
+class SelectStatementSegment(ansi.SelectStatementSegment):
     """A `SELECT` statement.
 
     https://dev.mysql.com/doc/refman/5.7/en/select.html
     """
 
-    type = "select_statement"
-    match_grammar = ansi_dialect.get_segment(
-        "SelectStatementSegment"
-    ).match_grammar.copy()
-
-    parse_grammar = ansi_dialect.get_segment(
-        "SelectStatementSegment"
-    ).parse_grammar.copy(
+    match_grammar = ansi.SelectStatementSegment.match_grammar
+    parse_grammar = ansi.SelectStatementSegment.parse_grammar.copy(
         insert=[Ref("QualifyClauseSegment", optional=True)],
         before=Ref("OrderByClauseSegment", optional=True),
     )
 
 
-@teradata_dialect.segment(replace=True)
-class UnorderedSelectStatementSegment(BaseSegment):
+class UnorderedSelectStatementSegment(ansi.UnorderedSelectStatementSegment):
     """An unordered `SELECT` statement.
 
     https://dev.mysql.com/doc/refman/5.7/en/select.html
     """
 
-    type = "select_statement"
-    match_grammar = ansi_dialect.get_segment(
-        "UnorderedSelectStatementSegment"
-    ).match_grammar.copy()
-
-    parse_grammar = ansi_dialect.get_segment(
-        "UnorderedSelectStatementSegment"
-    ).parse_grammar.copy(
+    match_grammar = ansi.UnorderedSelectStatementSegment.match_grammar
+    parse_grammar = ansi.UnorderedSelectStatementSegment.parse_grammar.copy(
         insert=[Ref("QualifyClauseSegment", optional=True)],
         before=Ref("OverlapsClauseSegment", optional=True),
     )
 
 
-@teradata_dialect.segment(replace=True)
 class SelectClauseModifierSegment(BaseSegment):
     """Things that come after SELECT but before the columns.
 
-    Adds NORMALIZE clause: https://docs.teradata.com/r/2_MC9vCtAJRlKle2Rpb0mA/UuxiA0mklFgv~33X5nyKMA
+    Adds NORMALIZE clause:
+    https://docs.teradata.com/r/2_MC9vCtAJRlKle2Rpb0mA/UuxiA0mklFgv~33X5nyKMA
     """
 
     type = "select_clause_modifier"
@@ -806,16 +786,16 @@ class SelectClauseModifierSegment(BaseSegment):
     )
 
 
-@teradata_dialect.segment(replace=True)
-class SelectClauseSegment(BaseSegment):
+class SelectClauseSegment(ansi.SelectClauseSegment):
     """A group of elements in a select target statement.
 
     Remove OVERLAPS as a terminator as this can be part of SelectClauseModifierSegment
     """
 
-    type = "select_clause"
     match_grammar = StartsWith(
-        Sequence("SELECT", Ref("WildcardExpressionSegment", optional=True)),
+        Sequence(
+            OneOf("SELECT", "SEL"), Ref("WildcardExpressionSegment", optional=True)
+        ),
         terminator=OneOf(
             "FROM",
             "WHERE",
@@ -825,5 +805,4 @@ class SelectClauseSegment(BaseSegment):
         ),
         enforce_whitespace_preceding_terminator=True,
     )
-
-    parse_grammar = ansi_dialect.get_segment("SelectClauseSegment").parse_grammar.copy()
+    parse_grammar = ansi.SelectClauseSegment.parse_grammar

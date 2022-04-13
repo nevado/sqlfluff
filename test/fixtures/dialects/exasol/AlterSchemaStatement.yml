@@ -3,7 +3,7 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: 2fcf3d2b421af1406bab7482ed4c07336ae96efea8ef12c97a23077fdfa7a121
+_hash: 22bd10c70d3ce15f9fbcbc9f70df88f04b05c510c0b04a40cc71f56274d3dd5b
 file:
 - statement:
     alter_schema_statement:
@@ -13,8 +13,7 @@ file:
         identifier: s1
     - keyword: CHANGE
     - keyword: OWNER
-    - schema_reference:
-        identifier: user1
+    - identifier: user1
 - statement_terminator: ;
 - statement:
     alter_schema_statement:
@@ -24,8 +23,7 @@ file:
         identifier: s1
     - keyword: CHANGE
     - keyword: OWNER
-    - schema_reference:
-        identifier: role1
+    - identifier: role1
 - statement_terminator: ;
 - statement:
     alter_schema_statement:
@@ -35,10 +33,21 @@ file:
         identifier: s1
     - keyword: SET
     - keyword: RAW_SIZE_LIMIT
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - literal: '128'
     - star: '*'
     - literal: '1024'
     - star: '*'
     - literal: '1024'
+- statement_terminator: ;
+- statement:
+    alter_schema_statement:
+    - keyword: ALTER
+    - keyword: SCHEMA
+    - schema_reference:
+        identifier: s1
+    - keyword: CHANGE
+    - keyword: OWNER
+    - identifier: '"role1"'
 - statement_terminator: ;

@@ -19,8 +19,9 @@ from sqlfluff.core.rules.doc_decorators import document_fix_compatible
 class Rule_L006(BaseRule):
     """Operators should be surrounded by a single whitespace.
 
-    | **Anti-pattern**
-    | In this example, there is a space missing space between the operator and 'b'.
+    **Anti-pattern**
+
+    In this example, there is a space missing between the operator and ``b``.
 
     .. code-block:: sql
 
@@ -29,8 +30,9 @@ class Rule_L006(BaseRule):
         FROM foo
 
 
-    | **Best practice**
-    | Keep a single space.
+    **Best practice**
+
+    Keep a single space.
 
     .. code-block:: sql
 
@@ -38,6 +40,11 @@ class Rule_L006(BaseRule):
             a + b
         FROM foo
     """
+
+    # L006 works on operators so requires three operators.
+    # However some rules that inherit from here (e.g. L048) do not.
+    # So allow this to be configurable.
+    _require_three_children: bool = True
 
     _target_elems: List[Tuple[str, str]] = [
         ("type", "binary_operator"),
@@ -98,7 +105,7 @@ class Rule_L006(BaseRule):
         # be dealt with by the parent segment. That also means that we need
         # to have at least three children.
 
-        if len(context.segment.segments) <= 2:
+        if self._require_three_children and len(context.segment.segments) <= 2:
             return LintResult()
 
         violations = []
@@ -125,7 +132,7 @@ class Rule_L006(BaseRule):
             # Is it a compound segment ending or starting with the target?
             elif sub_seg.segments:
                 # Get first and last raw segments.
-                raw_list = list(sub_seg.iter_raw_seg())
+                raw_list = list(sub_seg.get_raw_segments())
                 if len(raw_list) > 1:
                     leading = raw_list[0]
                     trailing = raw_list[-1]
@@ -160,14 +167,14 @@ class Rule_L006(BaseRule):
                         LintResult(
                             anchor=before_anchor,
                             description="Missing whitespace before {}".format(
-                                before_anchor.raw[:10]
+                                before_anchor.raw
                             ),
                             fixes=[
-                                LintFix(
-                                    "create",
-                                    # NB the anchor here is always in the parent and not anchor
-                                    anchor=sub_seg,
-                                    edit=WhitespaceSegment(raw=" "),
+                                LintFix.create_before(
+                                    # NB the anchor here is always in the parent and not
+                                    # anchor
+                                    anchor_segment=sub_seg,
+                                    edit_segments=[WhitespaceSegment(raw=" ")],
                                 )
                             ],
                         )
@@ -187,14 +194,14 @@ class Rule_L006(BaseRule):
                         LintResult(
                             anchor=after_anchor,
                             description="Missing whitespace after {}".format(
-                                after_anchor.raw[-10:]
+                                after_anchor.raw
                             ),
                             fixes=[
-                                LintFix(
-                                    "create",
-                                    # NB the anchor here is always in the parent and not anchor
-                                    anchor=next_seg,
-                                    edit=WhitespaceSegment(raw=" "),
+                                LintFix.create_before(
+                                    # NB the anchor here is always in the parent and not
+                                    # anchor
+                                    anchor_segment=next_seg,
+                                    edit_segments=[WhitespaceSegment(raw=" ")],
                                 )
                             ],
                         )

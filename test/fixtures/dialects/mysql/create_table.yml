@@ -3,7 +3,7 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: 6f423eff91e9a35194b8dbdbccf129cb9630492fde4d509c3bb5dab34139e631
+_hash: 71febe91f1d57338e1ff1d3ada75652ea5064ebdc3d6c10d20a6598ad5a0584f
 file:
   statement:
     create_table_statement:
@@ -12,8 +12,19 @@ file:
     - table_reference:
         identifier: '`foo`'
     - bracketed:
-        start_bracket: (
-        column_definition:
+      - start_bracket: (
+      - column_definition:
+          identifier: b
+          data_type:
+            data_type_identifier: VARCHAR
+            bracketed:
+              start_bracket: (
+              expression:
+                literal: '255'
+              end_bracket: )
+            keyword: BINARY
+      - comma: ','
+      - column_definition:
         - identifier: '`id`'
         - data_type:
             data_type_identifier: int
@@ -29,8 +40,8 @@ file:
           - keyword: 'NULL'
         - column_constraint_segment:
             keyword: AUTO_INCREMENT
-        comma: ','
-        table_constraint_segment:
+      - comma: ','
+      - table_constraint:
         - keyword: PRIMARY
         - keyword: KEY
         - bracketed:
@@ -38,15 +49,18 @@ file:
             column_reference:
               identifier: '`id`'
             end_bracket: )
-        end_bracket: )
+      - end_bracket: )
     - parameter: ENGINE
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - parameter: InnoDB
     - keyword: DEFAULT
     - parameter: CHARSET
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - parameter: utf8mb4
     - parameter: COLLATE
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - parameter: utf8mb4_unicode_ci
   statement_terminator: ;

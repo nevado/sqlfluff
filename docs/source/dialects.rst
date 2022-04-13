@@ -18,11 +18,11 @@ current dialects available on your installation of SQLFluff.
     to existing ones, the dependent nature of how dialects have been
     implemented is to try and reduce the amount of repetition in how
     different elements are defined. As an example, when we say that
-    the :ref:`snowflake_dialect_ref` dialect *inherits* from the
+    the :ref:`redshift_dialect_ref` dialect *inherits* from the
     :ref:`postgres_dialect_ref` dialect this is not because there
     is an agreement between those projects which means that features
     in one must end up in the other, but that the design of the
-    :ref:`snowflake_dialect_ref` dialect was heavily *inspired* by the
+    :ref:`redshift_dialect_ref` dialect was heavily *inspired* by the
     postgres dialect and therefore when defining the dialect within
     sqlfuff it makes sense to use :ref:`postgres_dialect_ref` as a
     starting point rather than starting from scratch.
@@ -88,6 +88,15 @@ The dialect for `MySQL`_.
 
 .. _`MySQL`: https://www.mysql.com/
 
+.. _oracle_dialect_ref:
+
+Oracle
+------
+
+The dialect for `Oracle`_ SQL. Note: this does not include PL/SQL.
+
+.. _`Oracle`: https://www.oracle.com/database/technologies/appdev/sql.html
+
 .. _postgres_dialect_ref:
 
 PostgreSQL
@@ -119,23 +128,23 @@ inherited from :ref:`postgres_dialect_ref`.
 
 .. _`Snowflake`: https://docs.snowflake.com/en/sql-reference.html
 
-.. _spark3_dialect_ref:
+.. _sparksql_dialect_ref:
 
-Spark3
-------
+SparkSQL
+--------
 
-The dialect for `Spark3`_. It inherits from :ref:`ansi_dialect_ref` and
+The dialect for `SparkSQL`_. It inherits from :ref:`ansi_dialect_ref` and
 includes relevant syntax from :ref:`hive_dialect_ref` for commands that
 permit Hive Format.
 
-This implementation focuses on the `ANSI Compliant dialect`_ introduced in
+This implementation focuses on the `Ansi Compliant Mode`_ introduced in
 Spark3, instead of being Hive Compliant. The introduction of ANSI Compliance
 provides better data quality and easier migration from traditional DBMS.
 
 Versions of Spark prior to 3.x will only support the Hive dialect.
 
-.. _`Spark3`: https://spark.apache.org/docs/latest/sql-ref.html
-.. _`Ansi Compliant dialect`: https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html
+.. _`SparkSQL`: https://spark.apache.org/docs/latest/sql-ref.html
+.. _`Ansi Compliant Mode`: https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html
 
 .. _sqlite_dialect_ref:
 

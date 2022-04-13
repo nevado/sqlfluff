@@ -20,7 +20,7 @@ class OrderByColumnInfo(NamedTuple):
 class Rule_L037(BaseRule):
     """Ambiguous ordering directions for columns in order by clause.
 
-    | **Anti-pattern**
+    **Anti-pattern**
 
     .. code-block:: sql
 
@@ -29,9 +29,10 @@ class Rule_L037(BaseRule):
         FROM foo
         ORDER BY a, b DESC
 
-    | **Best practice**
-    | If any columns in the ORDER BY clause specify ASC or DESC, they should all
-      do so.
+    **Best practice**
+
+    If any columns in the ``ORDER BY`` clause specify ``ASC`` or ``DESC``, they should
+    all do so.
 
     .. code-block:: sql
 
@@ -101,8 +102,7 @@ class Rule_L037(BaseRule):
                 if not col_info.order:
                     # Since ASC is default in SQL, add in ASC for fix
                     lint_fixes.append(
-                        LintFix(
-                            "create",
+                        LintFix.create_before(
                             col_info.separator,
                             [WhitespaceSegment(), KeywordSegment("ASC")],
                         )
@@ -113,8 +113,8 @@ class Rule_L037(BaseRule):
                     anchor=context.segment,
                     fixes=lint_fixes,
                     description=(
-                        "Ambiguous order by clause. Order by "
-                        "clauses should specify order direction for ALL columns or NO columns."
+                        "Ambiguous order by clause. Order by clauses should specify "
+                        "order direction for ALL columns or NO columns."
                     ),
                 )
             ]

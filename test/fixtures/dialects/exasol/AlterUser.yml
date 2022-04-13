@@ -3,10 +3,10 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: 7a4e7fe64893d26c9d498f2cc6d49b67dad25dea6b4d37e21b39ece86fe07699
+_hash: 58f0f47b74fde009b07b503fe4bcaccd06662393493edcae607f79d81a63f28e
 file:
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: user_1
@@ -18,7 +18,7 @@ file:
     - identifier: '"h12_xhz"'
 - statement_terminator: ;
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: user_1
@@ -28,7 +28,7 @@ file:
         identifier: '"h12_xhz"'
 - statement_terminator: ;
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: user_2
@@ -40,16 +40,17 @@ file:
       - literal: "'cn=user_2,dc=authorization,dc=exasol,dc=com'"
 - statement_terminator: ;
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: user_3
     - keyword: PASSWORD_EXPIRY_POLICY
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - literal: "'42 days'"
 - statement_terminator: ;
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: user_4
@@ -57,7 +58,7 @@ file:
     - keyword: EXPIRE
 - statement_terminator: ;
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: user_5
@@ -67,22 +68,69 @@ file:
     - keyword: ATTEMPTS
 - statement_terminator: ;
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: userx
     - keyword: SET
     - keyword: CONSUMER_GROUP
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - identifier: CEO
 - statement_terminator: ;
 - statement:
-    alter_user:
+    alter_user_statement:
     - keyword: ALTER
     - keyword: USER
     - identifier: userx
     - keyword: SET
     - keyword: CONSUMER_GROUP
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - keyword: 'NULL'
+- statement_terminator: ;
+- statement:
+    alter_user_statement:
+    - keyword: ALTER
+    - keyword: USER
+    - identifier: '"ADMIN"'
+    - keyword: SET
+    - keyword: CONSUMER_GROUP
+    - comparison_operator:
+        raw_comparison_operator: '='
+    - identifier: '"TABLE"'
+- statement_terminator: ;
+- statement:
+    alter_user_statement:
+    - keyword: ALTER
+    - keyword: USER
+    - identifier: '[admin]'
+    - keyword: SET
+    - keyword: CONSUMER_GROUP
+    - comparison_operator:
+        raw_comparison_operator: '='
+    - identifier: '"DAY"'
+- statement_terminator: ;
+- statement:
+    alter_user_statement:
+    - keyword: ALTER
+    - keyword: USER
+    - identifier: '"ADMIN"'
+    - keyword: SET
+    - keyword: CONSUMER_GROUP
+    - comparison_operator:
+        raw_comparison_operator: '='
+    - identifier: '[day]'
+- statement_terminator: ;
+- statement:
+    alter_user_statement:
+    - keyword: ALTER
+    - keyword: USER
+    - identifier: oidctestuser
+    - keyword: IDENTIFIED
+    - openid_auth:
+      - keyword: BY
+      - keyword: OPENID
+      - keyword: SUBJECT
+      - literal: "'database-user@exasol.example'"
 - statement_terminator: ;

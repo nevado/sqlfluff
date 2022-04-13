@@ -3,9 +3,9 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: cdcc18edd9b16e7f68ec8b226c88a4fe24425a5285b3dec06024364f9954c327
+_hash: bd17e7438ba701410abf847c3dd1fe1bc242b72f974edc5e624d4600166c290a
 file:
-  statement:
+- statement:
     select_statement:
       select_clause:
       - keyword: SELECT
@@ -39,7 +39,7 @@ file:
               expression:
                 literal: "'200010'"
               keyword: AS
-              td_internal_data_type:
+              data_type:
                 data_type_identifier: DATE
                 keyword: FORMAT
                 literal: "'YYYYMM'"
@@ -54,4 +54,50 @@ file:
             table_expression:
               table_reference:
                 identifier: EXAMPLE_TABLE
-  statement_terminator: ;
+- statement_terminator: ;
+- statement:
+    select_statement:
+      select_clause:
+        keyword: SEL
+        select_clause_element:
+          wildcard_expression:
+            wildcard_identifier:
+              star: '*'
+      from_clause:
+        keyword: FROM
+        from_expression:
+          from_expression_element:
+            table_expression:
+              table_reference:
+                identifier: CUSTOMERS
+- statement_terminator: ;
+- statement:
+    select_statement:
+      select_clause:
+        keyword: SELECT
+        select_clause_element:
+          wildcard_expression:
+            wildcard_identifier:
+              star: '*'
+      from_clause:
+        keyword: FROM
+        from_expression:
+          from_expression_element:
+            table_expression:
+              table_reference:
+                identifier: CUSTOMERS
+- statement_terminator: ;
+- statement:
+    select_statement:
+      select_clause:
+        keyword: SEL
+        select_clause_element:
+          literal: '1'
+- statement_terminator: ;
+- statement:
+    select_statement:
+      select_clause:
+        keyword: SELECT
+        select_clause_element:
+          literal: '1'
+- statement_terminator: ;

@@ -3,7 +3,7 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: e1eabbbf7187911728236ad955aac6db71d59b9eb3b9cb2616151546fa45813a
+_hash: 1defe2181e183fecfa6cce74536499bb95414e5ea89cd2ba328aeb9663f9b6f1
 file:
 - statement:
     select_statement:
@@ -46,7 +46,8 @@ file:
                       - identifier: another_table
                       - dot: .
                       - identifier: foo_id
-                    - comparison_operator: '='
+                    - comparison_operator:
+                        raw_comparison_operator: '='
                     - column_reference:
                       - identifier: some_table
                       - dot: .
@@ -84,26 +85,27 @@ file:
       select_clause:
         keyword: select
         select_clause_element:
-          typeless_struct:
-            keyword: struct
-            bracketed:
-            - start_bracket: (
-            - column_reference:
-              - identifier: bar
-              - dot: .
-              - identifier: bar_id
-            - alias_expression:
-                keyword: as
-                identifier: id
-            - comma: ','
-            - column_reference:
-              - identifier: bar
-              - dot: .
-              - identifier: bar_name
-            - alias_expression:
-                keyword: as
-                identifier: bar
-            - end_bracket: )
+          expression:
+            typeless_struct:
+              keyword: struct
+              bracketed:
+              - start_bracket: (
+              - column_reference:
+                - identifier: bar
+                - dot: .
+                - identifier: bar_id
+              - alias_expression:
+                  keyword: as
+                  identifier: id
+              - comma: ','
+              - column_reference:
+                - identifier: bar
+                - dot: .
+                - identifier: bar_name
+              - alias_expression:
+                  keyword: as
+                  identifier: bar
+              - end_bracket: )
           alias_expression:
             keyword: as
             identifier: bar
@@ -128,9 +130,65 @@ file:
                 - identifier: bar
                 - dot: .
                 - identifier: foo_id
-              - comparison_operator: '='
+              - comparison_operator:
+                  raw_comparison_operator: '='
               - column_reference:
                 - identifier: foo
                 - dot: .
                 - identifier: foo_id
 - statement_terminator: ;
+- statement:
+    select_statement:
+      select_clause:
+      - keyword: SELECT
+      - select_clause_element:
+          column_reference:
+            identifier: col_1
+      - comma: ','
+      - select_clause_element:
+          column_reference:
+            identifier: col_2
+      from_clause:
+        keyword: FROM
+        from_expression:
+          from_expression_element:
+            table_expression:
+              function:
+                function_name:
+                  function_name_identifier: UNNEST
+                bracketed:
+                  start_bracket: (
+                  expression:
+                    keyword: ARRAY
+                    start_angle_bracket: <
+                    data_type:
+                    - keyword: STRUCT
+                    - start_angle_bracket: <
+                    - parameter: col_1
+                    - data_type:
+                        data_type_identifier: STRING
+                    - comma: ','
+                    - parameter: col_2
+                    - data_type:
+                        data_type_identifier: STRING
+                    - end_angle_bracket: '>'
+                    end_angle_bracket: '>'
+                    array_literal:
+                    - start_square_bracket: '['
+                    - expression:
+                        bracketed:
+                        - start_bracket: (
+                        - literal: "'hello'"
+                        - comma: ','
+                        - literal: "'world'"
+                        - end_bracket: )
+                    - comma: ','
+                    - expression:
+                        bracketed:
+                        - start_bracket: (
+                        - literal: "'hi'"
+                        - comma: ','
+                        - literal: "'there'"
+                        - end_bracket: )
+                    - end_square_bracket: ']'
+                  end_bracket: )

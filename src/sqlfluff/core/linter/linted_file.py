@@ -7,6 +7,8 @@ post linting.
 
 import os
 import logging
+import shutil
+import tempfile
 from typing import (
     Any,
     Iterable,
@@ -28,9 +30,9 @@ from sqlfluff.core.string_helpers import findall
 from sqlfluff.core.templaters import TemplatedFile
 
 # Classes needed only for type checking
-from sqlfluff.core.parser.segments.base import BaseSegment, FixPatch
+from sqlfluff.core.parser.segments.base import BaseSegment, FixPatch, EnrichedFixPatch
 
-from sqlfluff.core.linter.common import NoQaDirective, EnrichedFixPatch
+from sqlfluff.core.linter.common import NoQaDirective
 
 # Instantiate the linter logger
 linter_logger: logging.Logger = logging.getLogger("sqlfluff.linter")
@@ -201,9 +203,7 @@ class LintedFile(NamedTuple):
         return not any(self.get_violations(filter_ignore=True))
 
     @staticmethod
-    def _log_hints(
-        patch: Union[EnrichedFixPatch, FixPatch], templated_file: TemplatedFile
-    ):
+    def _log_hints(patch: FixPatch, templated_file: TemplatedFile):
         """Log hints for debugging during patch generation."""
         # This next bit is ALL FOR LOGGING AND DEBUGGING
         max_log_length = 10
@@ -277,31 +277,30 @@ class LintedFile(NamedTuple):
         dedupe_buffer = []
         # We use enumerate so that we get an index for each patch. This is entirely
         # so when debugging logs we can find a given patch again!
-        patch: Union[EnrichedFixPatch, FixPatch]
+        patch: FixPatch  # Could be FixPatch or its subclass, EnrichedFixPatch
         for idx, patch in enumerate(
-            self.tree.iter_patches(templated_str=self.templated_file.templated_str)
+            self.tree.iter_patches(templated_file=self.templated_file)
         ):
             linter_logger.debug("  %s Yielded patch: %s", idx, patch)
             self._log_hints(patch, self.templated_file)
 
-            # Attempt to convert to source space.
+            # Get source_slice.
             try:
-                source_slice = self.templated_file.templated_slice_to_source_slice(
-                    patch.templated_slice,
-                )
-            except ValueError:
+                enriched_patch = patch.enrich(self.templated_file)
+            except ValueError:  # pragma: no cover
                 linter_logger.info(
-                    "      - Skipping. Source space Value Error. i.e. attempted insertion within templated section."
+                    "      - Skipping. Source space Value Error. i.e. attempted "
+                    "insertion within templated section."
                 )
                 # If we try and slice within a templated section, then we may fail
                 # in which case, we should skip this patch.
                 continue
 
             # Check for duplicates
-            dedupe_tuple = (source_slice, patch.fixed_raw)
-            if dedupe_tuple in dedupe_buffer:
+            if enriched_patch.dedupe_tuple() in dedupe_buffer:
                 linter_logger.info(
-                    "      - Skipping. Source space Duplicate: %s", dedupe_tuple
+                    "      - Skipping. Source space Duplicate: %s",
+                    enriched_patch.dedupe_tuple(),
                 )
                 continue
 
@@ -315,23 +314,15 @@ class LintedFile(NamedTuple):
 
             # Get the affected raw slices.
             local_raw_slices = self.templated_file.raw_slices_spanning_source_slice(
-                source_slice
+                enriched_patch.source_slice
             )
             local_type_list = [slc.slice_type for slc in local_raw_slices]
 
-            enriched_patch = EnrichedFixPatch(
-                source_slice=source_slice,
-                templated_slice=patch.templated_slice,
-                patch_category=patch.patch_category,
-                fixed_raw=patch.fixed_raw,
-                templated_str=self.templated_file.templated_str[patch.templated_slice],
-                source_str=self.templated_file.source_str[source_slice],
-            )
-
-            # Deal with the easy case of only literals
-            if set(local_type_list) == {"literal"}:
+            # Deal with the easy cases of 1) New code at end 2) only literals
+            if not local_type_list or set(local_type_list) == {"literal"}:
                 linter_logger.info(
-                    "      * Keeping patch on literal-only section: %s", enriched_patch
+                    "      * Keeping patch on new or literal-only section: %s",
+                    enriched_patch,
                 )
                 filtered_source_patches.append(enriched_patch)
                 dedupe_buffer.append(enriched_patch.dedupe_tuple())
@@ -347,24 +338,25 @@ class LintedFile(NamedTuple):
                 filtered_source_patches.append(enriched_patch)
                 dedupe_buffer.append(enriched_patch.dedupe_tuple())
             # If it's ONLY templated then we should skip it.
-            elif "literal" not in local_type_list:
+            elif "literal" not in local_type_list:  # pragma: no cover
                 linter_logger.info(
                     "      - Skipping patch over templated section: %s", enriched_patch
                 )
             # If we span more than two slices then we should just skip it. Too Hard.
-            elif len(local_raw_slices) > 2:
+            elif len(local_raw_slices) > 2:  # pragma: no cover
                 linter_logger.info(
                     "      - Skipping patch over more than two raw slices: %s",
                     enriched_patch,
                 )
-            # If it's an insertion (i.e. the string in the pre-fix template is '') then we
-            # won't be able to place it, so skip.
+            # If it's an insertion (i.e. the string in the pre-fix template is '') then
+            # we won't be able to place it, so skip.
             elif not enriched_patch.templated_str:  # pragma: no cover TODO?
                 linter_logger.info(
                     "      - Skipping insertion patch in templated section: %s",
                     enriched_patch,
                 )
-            # If the string from the templated version isn't in the source, then we can't fix it.
+            # If the string from the templated version isn't in the source, then we
+            # can't fix it.
             elif (
                 enriched_patch.templated_str not in enriched_patch.source_str
             ):  # pragma: no cover TODO?
@@ -372,14 +364,15 @@ class LintedFile(NamedTuple):
                     "      - Skipping edit patch on templated content: %s",
                     enriched_patch,
                 )
-            else:
+            else:  # pragma: no cover
                 # Identify all the places the string appears in the source content.
                 positions = list(
                     findall(enriched_patch.templated_str, enriched_patch.source_str)
                 )
                 if len(positions) != 1:
                     linter_logger.debug(
-                        "        - Skipping edit patch on non-unique templated content: %s",
+                        "        - Skipping edit patch on non-unique templated "
+                        "content: %s",
                         enriched_patch,
                     )
                     continue
@@ -400,7 +393,8 @@ class LintedFile(NamedTuple):
                     source_str=enriched_patch.source_str,
                 )
                 linter_logger.debug(  # pragma: no cover
-                    "      * Keeping Tricky Case. Positions: %s, New Slice: %s, Patch: %s",
+                    "      * Keeping Tricky Case. Positions: %s, New Slice: %s, "
+                    "Patch: %s",
                     positions,
                     new_source_slice,
                     enriched_patch,
@@ -493,7 +487,24 @@ class LintedFile(NamedTuple):
             if suffix:
                 root, ext = os.path.splitext(fname)
                 fname = root + suffix + ext
-            # Actually write the file.
-            with open(fname, "w", encoding=self.encoding) as f:
-                f.write(write_buff)
+            self._safe_create_replace_file(fname, write_buff, self.encoding)
         return success
+
+    @staticmethod
+    def _safe_create_replace_file(fname, write_buff, encoding):
+        # Write to a temporary file first, so in case of encoding or other
+        # issues, we don't delete or corrupt the user's existing file.
+        dirname, basename = os.path.split(fname)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding=encoding,
+            prefix=basename,
+            dir=dirname,
+            suffix=os.path.splitext(fname)[1],
+            delete=False,
+        ) as tmp:
+            tmp.file.write(write_buff)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        # Once the temp file is safely written, replace the existing file.
+        shutil.move(tmp.name, fname)

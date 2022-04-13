@@ -50,13 +50,13 @@ SQL code to be checked.
 
 2. Run `diff-quality`, specifying SQLFluff as the underlying tool:
 
-.. code-block:: bash
+.. code-block:: text
 
-    diff-quality --violations sqlfluff
+    $ diff-quality --violations sqlfluff
 
 The output will look something like:
 
-.. code-block:: bash
+.. code-block:: text
 
     -------------
     Diff Quality
@@ -106,6 +106,20 @@ SQLFluff comes with two `pre-commit`_ hooks:
 * sqlfluff-lint: returns linting errors.
 * sqlfluff-fix: attempts to fix rule violations.
 
+.. warning::
+   For safety reasons, ``sqlfluff-fix`` by default will not make any fixes in
+   files that had templating or parse errors, even if those errors were ignored
+   using ``noqa`` or `--ignore``.
+
+   Although it is not advised, you *can* tell SQLFluff to try and fix
+   these files by overriding the ``fix_even_unparsable`` setting
+   in ``.sqlfluff`` config file or using the ``sqlfluff fix --FIX-EVEN-UNPARSABLE``
+   command line option.
+
+   *Overriding this behavior may break your SQL. If you use this override,
+   always be sure to review any fixes applied to files with templating or parse
+   errors to verify they are okay.*
+
 You should create a file named `.pre-commit-config.yaml`
 at the root of your git project, which should look
 like this:
@@ -117,16 +131,27 @@ like this:
     rev: |release|
     hooks:
       - id: sqlfluff-lint
-        # For dbt projects, this installs the dbt "extras":
-        # additional_dependencies: ['.[dbt]']
+        # For dbt projects, this installs the dbt "extras".
+        # You will need to select the relevant dbt adapter for your dialect
+        # (https://docs.getdbt.com/docs/available-adapters):
+        # additional_dependencies: ['<dbt-adapter>', 'sqlfluff-templater-dbt']
       - id: sqlfluff-fix
         # Arbitrary arguments to show an example
         # args: [--rules, "L003,L014"]
-        # additional_dependencies: ['.[dbt]']
+        # additional_dependencies: ['<dbt-adapter>', 'sqlfluff-templater-dbt']
 
 When trying to use the `dbt templater`_, uncomment the
 ``additional_dependencies`` to install the extras.
-This is equivalent to running ``pip install sqlfluff[dbt]``.
+This is equivalent to running ``pip install <dbt-adapter> sqlfluff-templater-dbt``.
+
+You can specify the verion of ``dbt-adapter`` used in `pre-commit`_,
+for example:
+
+.. code-block:: yaml
+
+   additional_dependencies : ['dbt-bigquery==1.0.0', 'sqlfluff-templater-dbt']
+
+See the list of available `dbt-adapters`_.
 
 Note that you can pass the same arguments available
 through the CLI using ``args:``.
@@ -145,3 +170,4 @@ For more information and examples on using SQLFluff in GitHub Actions, see the
 .. _`dbt templater`: `dbt-project-configuration`
 .. _`GitHub Actions`: https://github.com/features/actions
 .. _`GitHub pull requests`: https://docs.github.com/en/github/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests
+.. _`dbt-adapters`: https://docs.getdbt.com/docs/available-adapters

@@ -192,12 +192,12 @@ def test__templater_python_slice_template(test, result):
     """Test _slice_template."""
     resp = list(PythonTemplater._slice_template(test))
     # check contigious
-    assert "".join(elem[0] for elem in resp) == test
+    assert "".join(elem.raw for elem in resp) == test
     # check indices
     idx = 0
-    for literal, _, pos, _ in resp:
-        assert pos == idx
-        idx += len(literal)
+    for raw_file_slice in resp:
+        assert raw_file_slice.source_idx == idx
+        idx += len(raw_file_slice.raw)
     # Check total result
     assert resp == result
 
@@ -410,7 +410,8 @@ def test__templater_python_split_uniques_coalesce_rest(
             [("literal", slice(0, 3, None), slice(0, 3, None))],
         ),
         (
-            "SELECT {blah}, {foo:.2f} as foo, {bar}, '{{}}' as convertable from something",
+            "SELECT {blah}, {foo:.2f} as foo, {bar}, '{{}}' as convertable from "
+            "something",
             "SELECT nothing, 435.24 as foo, spam, '{}' as convertable from something",
             True,
             [
@@ -455,11 +456,12 @@ def test__templater_python_split_uniques_coalesce_rest(
 )
 def test__templater_python_slice_file(raw_file, templated_file, unwrap_wrapped, result):
     """Test slice_file."""
-    _, resp, _ = PythonTemplater.slice_file(
+    _, resp, _ = PythonTemplater().slice_file(
         raw_file,
         templated_file,
         config=FluffConfig(
-            configs={"templater": {"unwrap_wrapped_queries": unwrap_wrapped}}
+            configs={"templater": {"unwrap_wrapped_queries": unwrap_wrapped}},
+            overrides={"dialect": "ansi"},
         ),
     )
     # Check contigious

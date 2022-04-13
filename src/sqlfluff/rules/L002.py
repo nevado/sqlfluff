@@ -16,9 +16,10 @@ class Rule_L002(BaseRule):
     This rule will fail if a single section of whitespace
     contains both tabs and spaces.
 
-    | **Anti-pattern**
-    | The • character represents a space and the → character represents a tab.
-    | In this example, the second line contains two spaces and one tab.
+    **Anti-pattern**
+
+    The ``•`` character represents a space and the ``→`` character represents a tab.
+    In this example, the second line contains two spaces and one tab.
 
     .. code-block:: sql
        :force:
@@ -27,8 +28,9 @@ class Rule_L002(BaseRule):
         ••→a
         FROM foo
 
-    | **Best practice**
-    | Change the line to use spaces only.
+    **Best practice**
+
+    Change the line to use spaces only.
 
     .. code-block:: sql
        :force:
@@ -52,7 +54,7 @@ class Rule_L002(BaseRule):
 
         if context.segment.is_type("whitespace"):
             if " " in context.segment.raw and "\t" in context.segment.raw:
-                if len(context.raw_stack) == 0 or context.raw_stack[-1].is_type(
+                if context.raw_segment_pre is None or context.raw_segment_pre.is_type(
                     "newline"
                 ):
                     # We've got a single whitespace at the beginning of a line.
@@ -61,15 +63,16 @@ class Rule_L002(BaseRule):
                     return LintResult(
                         anchor=context.segment,
                         fixes=[
-                            LintFix(
-                                "edit",
+                            LintFix.replace(
                                 context.segment,
-                                context.segment.edit(
-                                    context.segment.raw.replace(
-                                        "\t", " " * self.tab_space_size
-                                    )
-                                ),
-                            )
+                                [
+                                    context.segment.edit(
+                                        context.segment.raw.replace(
+                                            "\t", " " * self.tab_space_size
+                                        )
+                                    ),
+                                ],
+                            ),
                         ],
                     )
         return None

@@ -14,10 +14,9 @@ from sqlfluff.rules.L010 import Rule_L010
 class Rule_L030(Rule_L010):
     """Inconsistent capitalisation of function names.
 
-    The functionality for this rule is inherited from :obj:`Rule_L010`.
+    **Anti-pattern**
 
-    | **Anti-pattern**
-    | In this example, the two SUM functions don't have the same capitalisation.
+    In this example, the two ``SUM`` functions don't have the same capitalisation.
 
     .. code-block:: sql
 
@@ -26,8 +25,9 @@ class Rule_L030(Rule_L010):
             SUM(b) AS bb
         FROM foo
 
-    | **Best practice**
-    |  Make the case consistent.
+    **Best practice**
+
+    Make the case consistent.
 
     .. code-block:: sql
 
@@ -38,9 +38,15 @@ class Rule_L030(Rule_L010):
 
     """
 
+    lint_phase = "post"
     _target_elems: List[Tuple[str, str]] = [
         ("type", "function_name_identifier"),
         ("type", "bare_function"),
+    ]
+    _exclude_elements: List[Tuple[str, str]] = []
+    config_keywords = [
+        "extended_capitalisation_policy",
+        "ignore_words",
     ]
     _description_elem = "Function names"
 

@@ -3,7 +3,7 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: bcaa47623a370156fcde8a3ab393a378bb4481d0ffb4b5681113e56001a0942b
+_hash: 818d4638dcf988381d63e7393545018cb6d77a369501e6e6421bbf727aef2a0c
 file:
   batch:
     statement:
@@ -17,11 +17,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: day
+              - date_part: day
               - comma: ','
               - expression:
                   column_reference:
@@ -68,11 +67,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: year
+              - date_part: year
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -84,11 +82,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: quarter
+              - date_part: quarter
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -100,11 +97,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: month
+              - date_part: month
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -116,11 +112,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: dayofyear
+              - date_part: dayofyear
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -132,11 +127,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: day
+              - date_part: day
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -148,11 +142,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: week
+              - date_part: week
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -164,11 +157,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: hour
+              - date_part: hour
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -180,11 +172,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: minute
+              - date_part: minute
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -196,11 +187,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: second
+              - date_part: second
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -212,11 +202,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: millisecond
+              - date_part: millisecond
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -228,11 +217,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF
+                function_name_identifier: DATEDIFF
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: microsecond
+              - date_part: microsecond
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -244,11 +232,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEDIFF_BIG
+                function_name_identifier: DATEDIFF_BIG
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: microsecond
+              - date_part: microsecond
               - comma: ','
               - expression:
                   literal: "'2005-12-31 23:59:59.9999999'"
@@ -260,11 +247,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEADD
+                function_name_identifier: DATEADD
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: year
+              - date_part: year
               - comma: ','
               - expression:
                   literal: '2147483647'
@@ -276,11 +262,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATEADD
+                function_name_identifier: DATEADD
               bracketed:
               - start_bracket: (
-              - date_part:
-                  keyword: year
+              - date_part: year
               - comma: ','
               - expression:
                   numeric_literal:
@@ -294,11 +279,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATENAME
+                function_name_identifier: DATENAME
               bracketed:
                 start_bracket: (
-                date_part:
-                  keyword: year
+                date_part: year
                 comma: ','
                 expression:
                   literal: "'12:10:30.123'"
@@ -307,11 +291,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATENAME
+                function_name_identifier: DATENAME
               bracketed:
                 start_bracket: (
-                date_part:
-                  keyword: month
+                date_part: month
                 comma: ','
                 expression:
                   literal: "'12:10:30.123'"
@@ -320,11 +303,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATENAME
+                function_name_identifier: DATENAME
               bracketed:
                 start_bracket: (
-                date_part:
-                  keyword: day
+                date_part: day
                 comma: ','
                 expression:
                   literal: "'12:10:30.123'"
@@ -333,11 +315,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATENAME
+                function_name_identifier: DATENAME
               bracketed:
                 start_bracket: (
-                date_part:
-                  keyword: dayofyear
+                date_part: dayofyear
                 comma: ','
                 expression:
                   literal: "'12:10:30.123'"
@@ -346,11 +327,10 @@ file:
         - select_clause_element:
             function:
               function_name:
-                keyword: DATENAME
+                function_name_identifier: DATENAME
               bracketed:
                 start_bracket: (
-                date_part:
-                  keyword: weekday
+                date_part: weekday
                 comma: ','
                 expression:
                   literal: "'12:10:30.123'"

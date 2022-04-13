@@ -3,7 +3,7 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: 82a7e047718b1f973395d09965806bbc8bc319713d4dc32b931f6e6f4b16eb03
+_hash: 19edbb5f9ab43a54ea88bff6779c6e1a518f909eb2df6a642280db43f6260062
 file:
 - statement:
     create_function_statement:
@@ -30,7 +30,7 @@ file:
           start_bracket: (
           literal: '10'
           end_bracket: )
-    - keyword: IS
+    - keyword: AS
     - variable: res
     - data_type:
         keyword: DECIMAL
@@ -57,7 +57,9 @@ file:
     - expression:
         column_reference:
           identifier: res
-        binary_operator: '||'
+        binary_operator:
+        - pipe: '|'
+        - pipe: '|'
         literal: "' %'"
     - statement_terminator: ;
     - keyword: END
@@ -141,19 +143,22 @@ file:
           expression:
             case_expression:
             - keyword: CASE
-            - keyword: WHEN
-            - expression:
-                column_reference:
-                  identifier: input_variable
-                comparison_operator: <
-                literal: '0'
-            - keyword: THEN
-            - expression:
-                literal: '0'
-            - keyword: ELSE
-            - expression:
-                column_reference:
-                  identifier: input_variable
+            - when_clause:
+              - keyword: WHEN
+              - expression:
+                  column_reference:
+                    identifier: input_variable
+                  comparison_operator:
+                    raw_comparison_operator: <
+                  literal: '0'
+              - keyword: THEN
+              - expression:
+                  literal: '0'
+            - else_clause:
+                keyword: ELSE
+                expression:
+                  column_reference:
+                    identifier: input_variable
             - keyword: END
           statement_terminator: ;
     - keyword: RETURN
@@ -232,7 +237,8 @@ file:
         - expression:
             column_reference:
               identifier: input_variable
-            comparison_operator: '='
+            comparison_operator:
+              raw_comparison_operator: '='
             literal: '0'
         - keyword: THEN
         - function_body:
@@ -245,7 +251,8 @@ file:
         - expression:
             column_reference:
               identifier: input_variable
-            comparison_operator: '='
+            comparison_operator:
+              raw_comparison_operator: '='
             literal: '1'
         - keyword: THEN
         - function_body:
@@ -258,7 +265,8 @@ file:
         - expression:
             column_reference:
               identifier: input_variable
-            comparison_operator: '='
+            comparison_operator:
+              raw_comparison_operator: '='
             literal: '2'
         - keyword: THEN
         - function_body:
@@ -428,7 +436,9 @@ file:
         - expression:
           - column_reference:
               identifier: cnt
-          - comparison_operator: <=
+          - comparison_operator:
+            - raw_comparison_operator: <
+            - raw_comparison_operator: '='
           - column_reference:
               identifier: input_variable
         - keyword: DO
@@ -463,5 +473,124 @@ file:
     - keyword: END
     - function_reference:
         identifier: for_loop_function3
+    - statement_terminator: ;
+- function_script_terminator: /
+- statement:
+    create_function_statement:
+    - keyword: CREATE
+    - keyword: FUNCTION
+    - function_reference:
+      - identifier: schem
+      - dot: .
+      - identifier: func
+    - bracketed:
+      - start_bracket: (
+      - identifier: p1
+      - data_type:
+          keyword: VARCHAR
+          bracketed:
+            start_bracket: (
+            literal: '6'
+            end_bracket: )
+      - comma: ','
+      - identifier: p2
+      - data_type:
+          keyword: VARCHAR
+          bracketed:
+            start_bracket: (
+            literal: '10'
+            end_bracket: )
+      - end_bracket: )
+    - keyword: RETURN
+    - data_type:
+        keyword: VARCHAR
+        bracketed:
+          start_bracket: (
+          literal: '20'
+          end_bracket: )
+    - keyword: IS
+    - variable: res
+    - data_type:
+        keyword: VARCHAR
+        bracketed:
+          start_bracket: (
+          literal: '20'
+          end_bracket: )
+    - statement_terminator: ;
+    - keyword: BEGIN
+    - function_body:
+        function_if_branch:
+        - keyword: IF
+        - expression:
+          - column_reference:
+              identifier: p1
+          - keyword: IS
+          - keyword: NOT
+          - keyword: 'NULL'
+          - binary_operator: AND
+          - column_reference:
+              identifier: p2
+          - keyword: IS
+          - keyword: NOT
+          - keyword: 'NULL'
+        - keyword: THEN
+        - function_body:
+            function_if_branch:
+            - keyword: IF
+            - expression:
+                column_reference:
+                  identifier: p1
+                comparison_operator:
+                  raw_comparison_operator: '='
+                literal: '1'
+            - keyword: THEN
+            - function_body:
+                function_assignment:
+                  variable: res
+                  assignment_operator: :=
+                  literal: "'Hello World'"
+                  statement_terminator: ;
+            - keyword: ELSE
+            - function_body:
+                function_if_branch:
+                - keyword: IF
+                - expression:
+                    column_reference:
+                      identifier: p2
+                    comparison_operator:
+                      raw_comparison_operator: '='
+                    literal: '3'
+                - keyword: THEN
+                - function_body:
+                    function_assignment:
+                      variable: res
+                      assignment_operator: :=
+                      literal: "'ABC'"
+                      statement_terminator: ;
+                - keyword: END
+                - keyword: IF
+                - statement_terminator: ;
+            - function_body:
+                function_assignment:
+                  variable: res
+                  assignment_operator: :=
+                  literal: "'WOHOOOO'"
+                  statement_terminator: ;
+            - keyword: END
+            - keyword: IF
+            - statement_terminator: ;
+        - keyword: END
+        - keyword: IF
+        - statement_terminator: ;
+    - keyword: RETURN
+    - expression:
+        column_reference:
+          identifier: res
+    - statement_terminator: ;
+    - keyword: END
+    - function_reference:
+      - identifier: schem
+      - dot: .
+      - identifier: func
     - statement_terminator: ;
 - function_script_terminator: /

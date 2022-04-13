@@ -27,6 +27,20 @@ test_pass_cte_defined_and_used_2:
     FROM cte1
     JOIN cte2
 
+test_pass_cte_defined_and_used_case_insensitive:
+  pass_str: |
+    WITH cte1 AS (
+      SELECT a
+      FROM t
+    ),
+    cte2 AS (
+      SELECT b
+      FROM u
+    )
+    SELECT *
+    FROM cte1
+    JOIN Cte2
+
 test_fail_cte_defined_but_unused_1:
   desc: Two CTEs defined but only one used in final query.
   fail_str: |
@@ -160,3 +174,77 @@ test_pass_cte_defined_and_used_7:
     )
 
     select * from final
+
+test_snowflake_delete_cte:
+  fail_str: |
+    DELETE FROM MYTABLE1
+        USING (
+            WITH MYCTE AS (SELECT COLUMN2 FROM MYTABLE3)
+            SELECT COLUMN3 FROM MYTABLE3
+        ) X
+    WHERE COLUMN1 = X.COLUMN3
+  configs:
+    core:
+      dialect: snowflake
+
+test_pass_exasol_values_clause_cte_1:
+  pass_str: |
+    WITH txt AS (
+        VALUES (1)
+        AS t (id)
+    )
+
+    SELECT *
+    FROM txt
+  configs:
+    core:
+      dialect: exasol
+
+test_pass_exasol_values_clause_cte_2:
+  pass_str: |
+    WITH txt AS (
+        VALUES (1, 'foo')
+        AS t (id, name)
+    )
+
+    SELECT *
+    FROM txt
+  configs:
+    core:
+      dialect: exasol
+
+test_pass_sparksql_values_clause_cte_1:
+  pass_str: |
+    WITH txt AS (
+        VALUES (1)
+        AS t (id)
+    )
+
+    SELECT *
+    FROM txt
+  configs:
+    core:
+      dialect: sparksql
+
+test_pass_sparksql_values_clause_cte_2:
+  pass_str: |
+    WITH txt AS (
+        VALUES (1, 'foo')
+        AS t (id, name)
+    )
+
+    SELECT *
+    FROM txt
+  configs:
+    core:
+      dialect: sparksql
+
+test_fail_query_uses_templating:
+  fail_str: |
+    WITH
+    random_gibberish AS (
+        SELECT 1
+    )
+
+    SELECT var_bar
+    FROM {{ ref('issue_2235') }}

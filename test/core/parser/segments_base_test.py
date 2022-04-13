@@ -65,7 +65,8 @@ def test__parser__base_segments_raw(raw_seg):
     assert str(raw_seg) == repr(raw_seg) == "<CodeSegment: ([L:  1, P:  1]) 'foobar'>"
     assert (
         raw_seg.stringify(ident=1, tabsize=2)
-        == "[L:  1, P:  1]      |  raw:                                                        'foobar'\n"
+        == "[L:  1, P:  1]      |  raw:                                                "
+        "        'foobar'\n"
     )
     # Check tuple
     assert raw_seg.to_tuple() == ("raw", ())
@@ -99,8 +100,10 @@ def test__parser__base_segments_base(raw_seg_list, fresh_ansi_dialect):
     assert str(base_seg) == repr(base_seg) == "<DummySegment: ([L:  1, P:  1])>"
     assert base_seg.stringify(ident=1, tabsize=2) == (
         "[L:  1, P:  1]      |  dummy:\n"
-        "[L:  1, P:  1]      |    raw:                                                      'foobar'\n"
-        "[L:  1, P:  7]      |    raw:                                                      '.barfoo'\n"
+        "[L:  1, P:  1]      |    raw:                                                 "
+        "     'foobar'\n"
+        "[L:  1, P:  7]      |    raw:                                                 "
+        "     '.barfoo'\n"
     )
 
 
@@ -135,3 +138,9 @@ def test__parser__base_segments_file(raw_seg_list):
     assert base_seg.file_path == "/some/dir/file.sql"
     assert base_seg.can_start_end_non_code
     assert base_seg.allow_empty
+
+
+def test__parser__raw_get_raw_segments(raw_seg_list):
+    """Test niche case of calling get_raw_segments on a raw segment."""
+    for s in raw_seg_list:
+        assert s.get_raw_segments() == [s]

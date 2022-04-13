@@ -12,13 +12,16 @@ from sqlfluff.core.rules.doc_decorators import (
 class Rule_L004(BaseRule):
     """Incorrect indentation type.
 
-    Note 1: spaces are only fixed to tabs if the number of spaces in the
-    indent is an integer multiple of the tab_space_size config.
-    Note 2: fixes are only applied to indents at the start of a line. Indents
-    after other text on the same line are not fixed.
+    .. note::
+       Note 1: spaces are only fixed to tabs if the number of spaces in the
+       indent is an integer multiple of the ``tab_space_size`` config.
 
-    | **Anti-pattern**
-    | Using tabs instead of spaces when indent_unit config set to spaces (default).
+       Note 2: fixes are only applied to indents at the start of a line. Indents
+       after other text on the same line are not fixed.
+
+    **Anti-pattern**
+
+    Using tabs instead of spaces when ``indent_unit`` config set to ``space`` (default).
 
     .. code-block:: sql
        :force:
@@ -28,8 +31,9 @@ class Rule_L004(BaseRule):
         →   b
         from foo
 
-    | **Best practice**
-    | Change the line to use spaces only.
+    **Best practice**
+
+    Change the line to use spaces only.
 
     .. code-block:: sql
        :force:
@@ -42,7 +46,8 @@ class Rule_L004(BaseRule):
 
     config_keywords = ["indent_unit", "tab_space_size"]
 
-    # TODO fix indents after text: https://github.com/sqlfluff/sqlfluff/pull/590#issuecomment-739484190
+    # TODO fix indents after text:
+    # https://github.com/sqlfluff/sqlfluff/pull/590#issuecomment-739484190
     def _eval(self, context: RuleContext) -> LintResult:
         """Incorrect indentation found in file."""
         # Config type hints
@@ -51,9 +56,7 @@ class Rule_L004(BaseRule):
 
         tab = "\t"
         space = " "
-        correct_indent = (
-            space * self.tab_space_size if self.indent_unit == "space" else tab
-        )
+        correct_indent = self.indent
         wrong_indent = (
             tab if self.indent_unit == "space" else space * self.tab_space_size
         )
@@ -74,27 +77,32 @@ class Rule_L004(BaseRule):
                 )
                 # Only attempt a fix at the start of a newline for now
                 and (
-                    len(context.raw_stack) == 0
-                    or context.raw_stack[-1].is_type("newline")
+                    context.raw_segment_pre is None
+                    or context.raw_segment_pre.is_type("newline")
                 )
             ):
                 fixes = [
-                    LintFix(
-                        "edit",
+                    LintFix.replace(
                         context.segment,
-                        WhitespaceSegment(raw=edit_indent),
+                        [
+                            WhitespaceSegment(raw=edit_indent),
+                        ],
                     )
                 ]
             elif not (
-                len(context.raw_stack) == 0 or context.raw_stack[-1].is_type("newline")
+                context.raw_segment_pre is None
+                or context.raw_segment_pre.is_type("newline")
             ):
-                # give a helpful message if the wrong indent has been found and is not at the start of a newline
+                # give a helpful message if the wrong indent has been found and is not
+                # at the start of a newline
                 description += (
                     " The indent occurs after other text, so a manual fix is needed."
                 )
             else:
-                # If we get here, the indent_unit is tabs, and the number of spaces is not a multiple of tab_space_size
-                description += " The number of spaces is not a multiple of tab_space_size, so a manual fix is needed."
+                # If we get here, the indent_unit is tabs, and the number of spaces is
+                # not a multiple of tab_space_size
+                description += " The number of spaces is not a multiple of "
+                "tab_space_size, so a manual fix is needed."
             return LintResult(
                 anchor=context.segment, fixes=fixes, description=description
             )

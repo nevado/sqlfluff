@@ -3,10 +3,10 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: fbef98f38df25bcc26611bb0ddd260b27ffaed6baf51ec8fb10e2061839d9fa0
+_hash: 6d785c4bb5f484e913ace5ae9c1981a2f228c7986783ae66aa49296427c9c652
 file:
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:
@@ -15,11 +15,12 @@ file:
     - table_reference:
         identifier: '`table`'
     - keyword: LOCK
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - keyword: DEFAULT
 - statement_terminator: ;
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:
@@ -28,11 +29,12 @@ file:
     - table_reference:
         identifier: '`table`'
     - keyword: LOCK
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - keyword: NONE
 - statement_terminator: ;
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:
@@ -41,11 +43,12 @@ file:
     - table_reference:
         identifier: '`table`'
     - keyword: LOCK
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - keyword: SHARED
 - statement_terminator: ;
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:
@@ -54,11 +57,12 @@ file:
     - table_reference:
         identifier: '`table`'
     - keyword: LOCK
-    - comparison_operator: '='
+    - comparison_operator:
+        raw_comparison_operator: '='
     - keyword: EXCLUSIVE
 - statement_terminator: ;
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:
@@ -70,7 +74,7 @@ file:
     - keyword: DEFAULT
 - statement_terminator: ;
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:
@@ -82,7 +86,7 @@ file:
     - keyword: NONE
 - statement_terminator: ;
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:
@@ -94,7 +98,7 @@ file:
     - keyword: SHARED
 - statement_terminator: ;
 - statement:
-    drop_statement:
+    drop_index_statement:
     - keyword: DROP
     - keyword: INDEX
     - index_reference:

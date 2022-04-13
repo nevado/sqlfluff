@@ -4,6 +4,11 @@ CREATE FUNCTION add(integer, integer) RETURNS integer
     AS 'select $1 + $2;'
     LANGUAGE SQL;
 
+-- Quoted language options are deprecated but still supported
+CREATE FUNCTION add(integer, integer) RETURNS integer
+    AS 'select $1 + $2;'
+    LANGUAGE 'sql';
+
 CREATE OR REPLACE FUNCTION increment(i integer) RETURNS integer AS '
     BEGIN
         RETURN i + 1;
@@ -101,3 +106,17 @@ AS $function$
 select unnest(array['hi', 'test'])
 $function$
 ;
+
+CREATE OR REPLACE FUNCTION public.foo(_a TEXT, _$b INT)
+RETURNS FLOAT AS
+$$
+  RETURN 0.0
+$$ LANGUAGE plpgsql STABLE PARALLEL SAFE;
+
+CREATE FUNCTION _add(integer, integer) RETURNS integer
+    AS 'select $1 + $2;'
+    LANGUAGE SQL;
+
+CREATE FUNCTION _$add(integer, integer) RETURNS integer
+    AS 'select $1 + $2;'
+    LANGUAGE SQL;

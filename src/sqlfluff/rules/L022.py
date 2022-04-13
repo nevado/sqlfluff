@@ -4,16 +4,21 @@ from typing import Optional, List
 from sqlfluff.core.parser import NewlineSegment
 
 from sqlfluff.core.rules.base import BaseRule, LintFix, LintResult, RuleContext
-from sqlfluff.core.rules.doc_decorators import document_fix_compatible
+from sqlfluff.core.rules.doc_decorators import (
+    document_fix_compatible,
+    document_configuration,
+)
 
 
 @document_fix_compatible
+@document_configuration
 class Rule_L022(BaseRule):
     """Blank line expected but not found after CTE closing bracket.
 
-    | **Anti-pattern**
-    | There is no blank line after the CTE closing bracket. In queries with many
-    | CTEs this hinders readability.
+    **Anti-pattern**
+
+    There is no blank line after the CTE closing bracket. In queries with many
+    CTEs, this hinders readability.
 
     .. code-block:: sql
 
@@ -22,8 +27,9 @@ class Rule_L022(BaseRule):
         )
         SELECT a FROM plop
 
-    | **Best practice**
-    | Add a blank line.
+    **Best practice**
+
+    Add a blank line.
 
     .. code-block:: sql
 
@@ -54,7 +60,21 @@ class Rule_L022(BaseRule):
             )
             for idx, seg in enumerate(expanded_segments):
                 if seg.is_type("bracketed"):
-                    bracket_indices.append(idx)
+                    # Check if the preceding keyword is AS, otherwise it's a column name
+                    # definition in the CTE.
+                    preceding_keyword = next(
+                        (
+                            s
+                            for s in expanded_segments[:idx][::-1]
+                            if s.is_type("keyword")
+                        ),
+                        None,
+                    )
+                    if (
+                        preceding_keyword is not None
+                        and preceding_keyword.raw.upper() == "AS"
+                    ):
+                        bracket_indices.append(idx)
 
             # Work through each point and deal with it individually
             for bracket_idx in bracket_indices:
@@ -113,7 +133,8 @@ class Rule_L022(BaseRule):
 
                 # Readout of findings
                 self.logger.info(
-                    "blank_lines: %s, comma_line_idx: %s. final_line_idx: %s, final_seg_idx: %s",
+                    "blank_lines: %s, comma_line_idx: %s. final_line_idx: %s, "
+                    "final_seg_idx: %s",
                     blank_lines,
                     comma_line_idx,
                     line_idx,
@@ -132,16 +153,17 @@ class Rule_L022(BaseRule):
 
                     # Based on the current location of the comma we insert newlines
                     # to correct the issue.
-                    fix_type = "create"  # In most cases we just insert newlines.
+                    fix_type = "create_before"  # In most cases we just insert newlines.
                     if comma_style == "oneline":
-                        # Here we respect the target comma style to insert at the relevant point.
+                        # Here we respect the target comma style to insert at the
+                        # relevant point.
                         if self.comma_style == "trailing":
                             # Add a blank line after the comma
                             fix_point = forward_slice[comma_seg_idx + 1]
                             # Optionally here, if the segment we've landed on is
                             # whitespace then we REPLACE it rather than inserting.
                             if forward_slice[comma_seg_idx + 1].is_type("whitespace"):
-                                fix_type = "edit"
+                                fix_type = "replace"
                         elif self.comma_style == "leading":
                             # Add a blank line before the comma
                             fix_point = forward_slice[comma_seg_idx]
@@ -154,14 +176,15 @@ class Rule_L022(BaseRule):
                         if not comment_lines or line_idx - 1 not in comment_lines:
                             self.logger.info("Comment routines not applicable")
                             if comma_style in ("trailing", "final", "floating"):
-                                # Detected an existing trailing comma or it's a final CTE,
-                                # OR the comma isn't leading or trailing.
+                                # Detected an existing trailing comma or it's a final
+                                # CTE, OR the comma isn't leading or trailing.
                                 # If the preceding segment is whitespace, replace it
                                 if forward_slice[seg_idx - 1].is_type("whitespace"):
                                     fix_point = forward_slice[seg_idx - 1]
-                                    fix_type = "edit"
+                                    fix_type = "replace"
                                 else:
-                                    # Otherwise add a single newline before the end content.
+                                    # Otherwise add a single newline before the end
+                                    # content.
                                     fix_point = forward_slice[seg_idx]
                             elif comma_style == "leading":
                                 # Detected an existing leading comma.
@@ -171,12 +194,12 @@ class Rule_L022(BaseRule):
                             offset = 1
                             while line_idx - offset in comment_lines:
                                 offset += 1
+                            # If the offset - 1 equals the line_idx then there aren't
+                            # really any comment-only lines (ref #2945).
+                            # Reset to line_idx
                             fix_point = forward_slice[
-                                line_starts[line_idx - (offset - 1)]
+                                line_starts[line_idx - (offset - 1) or line_idx]
                             ]
-                        # Note: There is an edge case where this isn't enough, if
-                        # comments are in strange places, but we'll catch them on
-                        # the next iteration.
                         num_newlines = 1
 
                     fixes = [

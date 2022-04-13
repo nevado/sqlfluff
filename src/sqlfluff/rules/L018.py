@@ -1,18 +1,25 @@
 """Implementation of Rule L018."""
 
-from sqlfluff.core.parser import NewlineSegment, WhitespaceSegment
+from typing import cast
+
+from sqlfluff.core.parser import NewlineSegment, PositionMarker, WhitespaceSegment
 
 from sqlfluff.core.rules.base import BaseRule, LintFix, LintResult, RuleContext
-from sqlfluff.core.rules.doc_decorators import document_fix_compatible
+from sqlfluff.core.rules.doc_decorators import (
+    document_fix_compatible,
+    document_configuration,
+)
 
 
 @document_fix_compatible
+@document_configuration
 class Rule_L018(BaseRule):
-    """WITH clause closing bracket should be aligned with WITH keyword.
+    """``WITH`` clause closing bracket should be aligned with ``WITH`` keyword.
 
-    | **Anti-pattern**
-    | The • character represents a space.
-    | In this example, the closing bracket is not aligned with WITH keyword.
+    **Anti-pattern**
+
+    The ``•`` character represents a space.
+    In this example, the closing bracket is not aligned with ``WITH`` keyword.
 
     .. code-block:: sql
        :force:
@@ -23,8 +30,9 @@ class Rule_L018(BaseRule):
 
         SELECT * FROM zoo
 
-    | **Best practice**
-    | Remove the spaces to align the WITH keyword with the closing bracket.
+    **Best practice**
+
+    Remove the spaces to align the ``WITH`` keyword with the closing bracket.
 
     .. code-block:: sql
 
@@ -37,6 +45,7 @@ class Rule_L018(BaseRule):
     """
 
     _works_on_unparsable = False
+    needs_raw_stack = True
     config_keywords = ["tab_space_size"]
 
     def _eval(self, context: RuleContext) -> LintResult:
@@ -101,43 +110,37 @@ class Rule_L018(BaseRule):
                             return LintResult(
                                 anchor=seg,
                                 fixes=[
-                                    LintFix(
-                                        "create",
+                                    LintFix.create_before(
                                         seg,
-                                        WhitespaceSegment(" " * (-indent_diff)),
+                                        [WhitespaceSegment(" " * (-indent_diff))],
                                     )
                                 ],
                             )
                         elif indent_diff > 0:
                             # Is it all whitespace before the bracket on this line?
+                            assert seg.pos_marker
                             prev_segs_on_line = [
                                 elem
-                                for elem in context.segment.iter_segments(
-                                    expanding=["common_table_expression", "bracketed"],
-                                    pass_through=True,
-                                )
-                                if elem.pos_marker.line_no == seg.pos_marker.line_no
-                                and elem.pos_marker.line_pos < seg.pos_marker.line_pos
+                                for elem in context.segment.raw_segments
+                                if cast(PositionMarker, elem.pos_marker).line_no
+                                == seg.pos_marker.line_no
+                                and cast(PositionMarker, elem.pos_marker).line_pos
+                                < seg.pos_marker.line_pos
                             ]
                             if all(
                                 elem.is_type("whitespace") for elem in prev_segs_on_line
                             ):
                                 # We can move it back, it's all whitespace
                                 fixes = [
-                                    LintFix(
-                                        "create",
+                                    LintFix.create_before(
                                         seg,
                                         [WhitespaceSegment(with_indent_str)],
                                     )
-                                ] + [
-                                    LintFix("delete", elem)
-                                    for elem in prev_segs_on_line
-                                ]
+                                ] + [LintFix.delete(elem) for elem in prev_segs_on_line]
                             else:
                                 # We have to move it to a newline
                                 fixes = [
-                                    LintFix(
-                                        "create",
+                                    LintFix.create_before(
                                         seg,
                                         [
                                             NewlineSegment(),

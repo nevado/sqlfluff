@@ -7,18 +7,23 @@ from sqlfluff.core.parser import (
 )
 
 from sqlfluff.core.rules.base import BaseRule, LintResult, LintFix, RuleContext
-from sqlfluff.core.rules.doc_decorators import document_fix_compatible
+from sqlfluff.core.rules.doc_decorators import (
+    document_fix_compatible,
+    document_configuration,
+)
 
 
 @document_fix_compatible
+@document_configuration
 class Rule_L011(BaseRule):
     """Implicit/explicit aliasing of table.
 
     Aliasing of table to follow preference
-    (explicit using an `AS` clause is default).
+    (requiring an explicit ``AS`` is the default).
 
-    | **Anti-pattern**
-    | In this example, the alias 'voo' is implicit.
+    **Anti-pattern**
+
+    In this example, the alias ``voo`` is implicit.
 
     .. code-block:: sql
 
@@ -26,8 +31,9 @@ class Rule_L011(BaseRule):
             voo.a
         FROM foo voo
 
-    | **Best practice**
-    | Add `AS` to make it explicit.
+    **Best practice**
+
+    Add ``AS`` to make it explicit.
 
     .. code-block:: sql
 
@@ -46,43 +52,43 @@ class Rule_L011(BaseRule):
 
         We look for the alias segment, and then evaluate its parent and whether
         it contains an AS keyword. This is the _eval function for both L011 and L012.
-
-        The use of `raw_stack` is just for working out how much whitespace to add.
-
         """
+        # Config type hints
+        self.aliasing: str
         fixes = []
 
         if context.segment.is_type("alias_expression"):
             if context.parent_stack[-1].is_type(*self._target_elems):
                 if any(e.name.lower() == "as" for e in context.segment.segments):
-                    if self.aliasing == "implicit":  # type: ignore
+                    if self.aliasing == "implicit":
                         if context.segment.segments[0].name.lower() == "as":
 
                             # Remove the AS as we're using implict aliasing
-                            fixes.append(LintFix("delete", context.segment.segments[0]))
-                            anchor = context.raw_stack[-1]
+                            fixes.append(LintFix.delete(context.segment.segments[0]))
+                            anchor = context.raw_segment_pre
 
                             # Remove whitespace before (if exists) or after (if not)
                             if (
-                                len(context.raw_stack) > 0
-                                and context.raw_stack[-1].type == "whitespace"
+                                context.raw_segment_pre is not None
+                                and context.raw_segment_pre.type == "whitespace"
                             ):
-                                fixes.append(LintFix("delete", context.raw_stack[-1]))
+                                fixes.append(LintFix.delete(context.raw_segment_pre))
                             elif (
                                 len(context.segment.segments) > 0
                                 and context.segment.segments[1].type == "whitespace"
                             ):
                                 fixes.append(
-                                    LintFix("delete", context.segment.segments[1])
+                                    LintFix.delete(context.segment.segments[1])
                                 )
 
                             return LintResult(anchor=anchor, fixes=fixes)
 
-                else:
+                elif self.aliasing != "implicit":
                     insert_buff: List[Union[WhitespaceSegment, KeywordSegment]] = []
 
                     # Add initial whitespace if we need to...
-                    if context.raw_stack[-1].name not in ["whitespace", "newline"]:
+                    assert context.raw_segment_pre
+                    if context.raw_segment_pre.name not in ["whitespace", "newline"]:
                         insert_buff.append(WhitespaceSegment())
 
                     # Add an AS (Uppercase for now, but could be corrected later)
@@ -98,7 +104,10 @@ class Rule_L011(BaseRule):
                     return LintResult(
                         anchor=context.segment,
                         fixes=[
-                            LintFix("create", context.segment.segments[0], insert_buff)
+                            LintFix.create_before(
+                                context.segment.segments[0],
+                                insert_buff,
+                            )
                         ],
                     )
         return None

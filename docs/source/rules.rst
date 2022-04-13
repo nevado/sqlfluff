@@ -16,31 +16,7 @@ Specific Rules
    :members:
    :member-order: alphabetical
 
-
-Implementation
---------------
-
-.. autoclass:: sqlfluff.core.rules.base.RuleSet
-   :members:
-
-.. autoclass:: sqlfluff.core.rules.base.BaseRule
-   :members:
-   :private-members:
-
-.. autoclass:: sqlfluff.core.rules.base.LintResult
-   :members:
-
-.. autoclass:: sqlfluff.core.rules.base.LintFix
-   :members:
-
-
-The `_eval` function of each rule should take enough arguments that it can
-evaluate the position of the given segment in relation to its neighbors,
-and that the segment which finally "triggers" the error, should be the one
-that would be corrected OR if the rule relates to something that is missing,
-then it should flag on the segment FOLLOWING, the place that the desired
-element is missing.
-
+.. _inline_ignoring_errors:
 
 Inline Ignoring Errors
 -----------------------
@@ -62,7 +38,14 @@ ignore templating (``TMP``) & parsing (``PRS``) errors.
 
 .. code-block:: sql
 
-   WHERE dt >= DATE_ADD(CURRENT_DATE(), INTERVAL -2 DAY) -- noqa: PRS
+   WHERE
+     col1 = 2 AND
+     dt >= DATE_ADD(CURRENT_DATE(), INTERVAL -2 DAY) -- noqa: PRS
+
+.. note::
+   It should be noted that ignoring ``TMP`` and ``PRS`` errors can lead to
+   incorrect ``sqlfluff lint`` and ``sqfluff fix`` results as `SQLFluff` can
+   misinterpret the SQL being analysed.
 
 Should the need arise, not specifying specific rules to ignore will ignore
 all rules on the given line.
@@ -83,13 +66,13 @@ ignored until a corresponding `-- noqa:enable=<rule>[,...] | all` directive.
 .. code-block:: sql
 
     -- Ignore rule L012 from this line forward
-    SELECT col_a a FROM foo --noqa: disable=L012
+    SELECT col_a a FROM foo -- noqa: disable=L012
 
     -- Ignore all rules from this line forward
-    SELECT col_a a FROM foo --noqa: disable=all
+    SELECT col_a a FROM foo -- noqa: disable=all
 
     -- Enforce all rules from this line forward
-    SELECT col_a a FROM foo --noqa: enable=all
+    SELECT col_a a FROM foo -- noqa: enable=all
 
 
 .. _`pylint's "pylint" directive"`: http://pylint.pycqa.org/en/latest/user_guide/message-control.html

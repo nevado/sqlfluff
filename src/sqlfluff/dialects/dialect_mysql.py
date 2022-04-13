@@ -15,13 +15,17 @@ from sqlfluff.core.parser import (
     CommentSegment,
     NamedParser,
     CodeSegment,
+    StartsWith,
     StringParser,
     SymbolSegment,
     Delimited,
     RegexParser,
     Anything,
+    AnySetOf,
+    Matchable,
 )
 from sqlfluff.core.dialects import load_raw_dialect
+from sqlfluff.dialects import dialect_ansi as ansi
 
 ansi_dialect = load_raw_dialect("ansi")
 mysql_dialect = ansi_dialect.copy_as("mysql")
@@ -33,15 +37,23 @@ mysql_dialect.patch_lexer_matchers(
             r"(-- |#)[^\n]*",
             CommentSegment,
             segment_kwargs={"trim_start": ("-- ", "#")},
-        )
+        ),
+        RegexLexer(
+            "single_quote", r"(?s)('')+?(?!')|('.*?(?<!')(?:'')*'(?!'))", CodeSegment
+        ),
     ]
 )
 
 # Reserve USE, FORCE & IGNORE
 mysql_dialect.sets("unreserved_keywords").difference_update(
     [
+        "BTREE",
         "FORCE",
+        "HASH",
         "IGNORE",
+        "INVISIBLE",
+        "KEY_BLOCK_SIZE",
+        "PARSER",
         "USE",
         "SQL_BUFFER_RESULT",
         "SQL_NO_CACHE",
@@ -63,10 +75,28 @@ mysql_dialect.sets("unreserved_keywords").difference_update(
         "COLUMN_NAME",
         "CURSOR_NAME",
         "STACKED",
+        "VISIBLE",
+    ]
+)
+mysql_dialect.sets("unreserved_keywords").update(
+    [
+        "QUICK",
+        "FAST",
+        "MEDIUM",
+        "EXTENDED",
+        "CHANGED",
+        "UPGRADE",
+        "HISTOGRAM",
+        "BUCKETS",
+        "USE_FRM",
+        "REPAIR",
+        "DUPLICATE",
+        "NOW",
     ]
 )
 mysql_dialect.sets("reserved_keywords").update(
     [
+        "HELP",
         "FORCE",
         "IGNORE",
         "USE",
@@ -98,6 +128,7 @@ mysql_dialect.sets("reserved_keywords").update(
         "NONE",
         "SHARED",
         "EXCLUSIVE",
+        "MASTER",
     ]
 )
 
@@ -133,6 +164,40 @@ mysql_dialect.replace(
             Ref("LocalVariableNameSegment"),
         ]
     ),
+    DateTimeLiteralGrammar=Sequence(
+        # MySQL does not require the keyword to be specified:
+        # https://dev.mysql.com/doc/refman/8.0/en/date-and-time-literals.html
+        OneOf(
+            "DATE",
+            "TIME",
+            "TIMESTAMP",
+            "DATETIME",
+            "INTERVAL",
+            optional=True,
+        ),
+        OneOf(
+            Ref("QuotedLiteralSegment"),
+            Ref("NumericLiteralSegment"),
+        ),
+    ),
+    QuotedLiteralSegment=AnyNumberOf(
+        # MySQL allows whitespace-concatenated string literals (#1488).
+        # Since these string literals can have comments between them,
+        # we use grammar to handle this.
+        NamedParser(
+            "single_quote",
+            CodeSegment,
+            name="quoted_literal",
+            type="literal",
+        ),
+        min_times=1,
+    ),
+    UniqueKeyGrammar=Sequence(
+        "UNIQUE",
+        Ref.keyword("KEY", optional=True),
+    ),
+    # Odd syntax, but pr
+    CharCharacterSetGrammar=Ref.keyword("BINARY"),
 )
 
 mysql_dialect.add(
@@ -144,16 +209,28 @@ mysql_dialect.add(
         trim_chars=('"',),
     ),
     AtSignLiteralSegment=NamedParser(
-        "atsign",
+        "at_sign",
         CodeSegment,
-        name="atsign_literal",
+        name="at_sign_literal",
         type="literal",
         trim_chars=("@",),
     ),
 )
 
 
-@mysql_dialect.segment(replace=True)
+class AliasExpressionSegment(BaseSegment):
+    """A reference to an object with an `AS` clause.
+
+    The optional AS keyword allows both implicit and explicit aliasing.
+    """
+
+    type = "alias_expression"
+    match_grammar = Sequence(
+        Ref.keyword("AS", optional=True),
+        Ref("SingleIdentifierGrammar"),
+    )
+
+
 class ColumnDefinitionSegment(BaseSegment):
     """A column definition, e.g. for CREATE TABLE or ALTER TABLE."""
 
@@ -162,10 +239,8 @@ class ColumnDefinitionSegment(BaseSegment):
         Ref("SingleIdentifierGrammar"),  # Column name
         OneOf(  # Column type
             # DATETIME and TIMESTAMP take special logic
-            AnyNumberOf(
-                Ref("DatatypeSegment"),
-                max_times=1,
-                min_times=1,
+            Ref(
+                "DatatypeSegment",
                 exclude=OneOf("DATETIME", "TIMESTAMP"),
             ),
             Sequence(
@@ -178,10 +253,9 @@ class ColumnDefinitionSegment(BaseSegment):
                 Sequence("DEFAULT", optional=True),
                 OneOf(
                     Sequence(
-                        "CURRENT_TIMESTAMP",
-                        Sequence(
-                            Bracketed(Ref("NumericLiteralSegment")),
-                            optional=True,
+                        OneOf("CURRENT_TIMESTAMP", "NOW"),
+                        Bracketed(
+                            Ref("NumericLiteralSegment", optional=True), optional=True
                         ),
                     ),
                     Ref("NumericLiteralSegment"),
@@ -206,18 +280,13 @@ class ColumnDefinitionSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
-class CreateTableStatementSegment(
-    ansi_dialect.get_segment("CreateTableStatementSegment")  # type: ignore
-):
+class CreateTableStatementSegment(ansi.CreateTableStatementSegment):
     """Create table segment.
 
     https://dev.mysql.com/doc/refman/8.0/en/create-table.html
     """
 
-    match_grammar = ansi_dialect.get_segment(
-        "CreateTableStatementSegment"
-    ).match_grammar.copy(
+    match_grammar = ansi.CreateTableStatementSegment.match_grammar.copy(
         insert=[
             AnyNumberOf(
                 Sequence(
@@ -231,6 +300,215 @@ class CreateTableStatementSegment(
     )
 
 
+class UpsertClauseListSegment(BaseSegment):
+    """An `ON DUPLICATE KEY UPDATE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html
+    """
+
+    type = "upsert_clause_list"
+    match_grammar = Sequence(
+        "ON",
+        "DUPLICATE",
+        "KEY",
+        "UPDATE",
+        Delimited(Ref("SetClauseSegment")),
+    )
+
+
+class InsertRowAliasSegment(BaseSegment):
+    """A row alias segment (used in `INSERT` statements).
+
+    https://dev.mysql.com/doc/refman/8.0/en/insert.html
+    """
+
+    type = "insert_row_alias"
+    match_grammar = Sequence(
+        "AS",
+        Ref("SingleIdentifierGrammar"),
+        Bracketed(
+            Ref("SingleIdentifierListSegment"),
+            optional=True,
+        ),
+    )
+
+
+class InsertStatementSegment(BaseSegment):
+    """An `INSERT` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/insert.html
+    """
+
+    type = "insert_statement"
+    match_grammar = Sequence(
+        "INSERT",
+        OneOf(
+            "LOW_PRIORITY",
+            "DELAYED",
+            "HIGH_PRIORITY",
+            optional=True,
+        ),
+        Ref.keyword("IGNORE", optional=True),
+        Ref.keyword("INTO", optional=True),
+        Ref("TableReferenceSegment"),
+        Sequence(
+            "PARTITION",
+            Bracketed(
+                Ref("SingleIdentifierListSegment"),
+            ),
+            optional=True,
+        ),
+        Ref("BracketedColumnReferenceListGrammar", optional=True),
+        AnySetOf(
+            OneOf(
+                Ref("ValuesClauseSegment"),
+                Ref("SetClauseListSegment"),
+                Sequence(
+                    OneOf(
+                        Ref("SelectableGrammar"),
+                        Sequence(
+                            "TABLE",
+                            Ref("TableReferenceSegment"),
+                        ),
+                    ),
+                ),
+                optional=False,
+            ),
+            Ref("InsertRowAliasSegment", optional=True),
+            Ref("UpsertClauseListSegment", optional=True),
+        ),
+    )
+
+
+class DeleteUsingClauseSegment(BaseSegment):
+    """A `USING` clause froma `DELETE` Statement`."""
+
+    type = "using_clause"
+    match_grammar = StartsWith(
+        "USING",
+        terminator=Ref("FromClauseTerminatorGrammar"),
+        enforce_whitespace_preceding_terminator=True,
+    )
+    parse_grammar = Sequence(
+        "USING",
+        Delimited(
+            Ref("FromExpressionSegment"),
+        ),
+    )
+
+
+class DeleteStatementSegment(BaseSegment):
+    """A `DELETE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/delete.html
+    """
+
+    type = "delete_statement"
+    match_grammar = Sequence(
+        "DELETE",
+        Ref.keyword("LOW_PRIORITY", optional=True),
+        Ref.keyword("QUICK", optional=True),
+        Ref.keyword("IGNORE", optional=True),
+        OneOf(
+            Sequence(
+                "FROM",
+                Delimited(
+                    Ref("TableReferenceSegment"), terminator=Ref.keyword("USING")
+                ),
+                Ref("DeleteUsingClauseSegment"),
+                Ref("WhereClauseSegment", optional=True),
+            ),
+            Sequence(
+                Delimited(Ref("TableReferenceSegment"), terminator=Ref.keyword("FROM")),
+                Ref("FromClauseSegment"),
+                Ref("WhereClauseSegment", optional=True),
+            ),
+            Sequence(
+                Ref("FromClauseSegment"),
+                Ref("SelectPartitionClauseSegment", optional=True),
+                Ref("WhereClauseSegment", optional=True),
+                Ref("OrderByClauseSegment", optional=True),
+                Ref("LimitClauseSegment", optional=True),
+            ),
+        ),
+    )
+
+
+class TableConstraintSegment(BaseSegment):
+    """A table constraint, e.g. for CREATE TABLE."""
+
+    type = "table_constraint"
+    # Later add support for CHECK constraint, others?
+    # e.g. CONSTRAINT constraint_1 PRIMARY KEY(column_1)
+    match_grammar = Sequence(
+        Sequence(  # [ CONSTRAINT <Constraint name> ]
+            "CONSTRAINT", Ref("ObjectReferenceSegment"), optional=True
+        ),
+        OneOf(
+            Sequence(  # UNIQUE [INDEX | KEY] [index_name] ( column_name [, ... ] )
+                "UNIQUE",
+                OneOf("INDEX", "KEY", optional=True),
+                Ref("ObjectReferenceSegment", optional=True),
+                Ref("BracketedColumnReferenceListGrammar"),
+                # Later add support for index_parameters?
+            ),
+            Sequence(  # PRIMARY KEY ( column_name [, ... ] ) index_parameters
+                Ref("PrimaryKeyGrammar"),
+                # Columns making up PRIMARY KEY constraint
+                Ref("BracketedColumnReferenceListGrammar"),
+                # Later add support for index_parameters?
+            ),
+            Sequence(  # FOREIGN KEY ( column_name [, ... ] )
+                # REFERENCES reftable [ ( refcolumn [, ... ] ) ]
+                Ref("ForeignKeyGrammar"),
+                # Local columns making up FOREIGN KEY constraint
+                Ref("BracketedColumnReferenceListGrammar"),
+                "REFERENCES",
+                Ref("ColumnReferenceSegment"),
+                # Foreign columns making up FOREIGN KEY constraint
+                Ref("BracketedColumnReferenceListGrammar"),
+                # Later add support for [MATCH FULL/PARTIAL/SIMPLE] ?
+                # Later add support for [ ON DELETE/UPDATE action ] ?
+                AnyNumberOf(
+                    Sequence(
+                        "ON",
+                        OneOf("DELETE", "UPDATE"),
+                        OneOf(
+                            "RESTRICT",
+                            "CASCADE",
+                            Sequence("SET", "NULL"),
+                            Sequence("NO", "ACTION"),
+                            Sequence("SET", "DEFAULT"),
+                        ),
+                        optional=True,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
+class IntervalExpressionSegment(BaseSegment):
+    """An interval expression segment.
+
+    https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_adddate
+    """
+
+    type = "interval_expression"
+    match_grammar = Sequence(
+        "INTERVAL",
+        OneOf(
+            # The Numeric Version
+            Sequence(
+                Ref("ExpressionSegment"),
+                OneOf(Ref("QuotedLiteralSegment"), Ref("DatetimeUnitSegment")),
+            ),
+            # The String version
+            Ref("QuotedLiteralSegment"),
+        ),
+    )
+
+
 mysql_dialect.add(
     DoubleForwardSlashSegment=StringParser(
         "//", SymbolSegment, name="doubleforwardslash", type="statement_terminator"
@@ -239,7 +517,7 @@ mysql_dialect.add(
         "$$", SymbolSegment, name="doubledollarsign", type="statement_terminator"
     ),
     AtSignSignSegment=StringParser(
-        "@", SymbolSegment, name="atsign", type="user_designator"
+        "@", SymbolSegment, name="at_sign", type="user_designator"
     ),
     OutputParameterSegment=StringParser(
         "OUT", SymbolSegment, name="inputparameter", type="parameter_direction"
@@ -275,10 +553,18 @@ mysql_dialect.add(
         name="declared_variable",
         type="variable",
     ),
+    BooleanDynamicSystemVariablesGrammar=OneOf(
+        # Boolean dynamic system varaiables can be set to ON/OFF, TRUE/FALSE, or 0/1:
+        # https://dev.mysql.com/doc/refman/8.0/en/dynamic-system-variables.html
+        # This allows us to match ON/OFF & TRUE/FALSE as keywords and therefore apply
+        # the correct capitalisation policy.
+        OneOf("ON", "OFF"),
+        OneOf("TRUE", "FALSE"),
+    ),
 )
 
 mysql_dialect.replace(
-    DelimiterSegment=OneOf(Ref("SemicolonSegment"), Ref("TildeSegment")),
+    DelimiterGrammar=OneOf(Ref("SemicolonSegment"), Ref("TildeSegment")),
     TildeSegment=StringParser(
         "~", SymbolSegment, name="tilde", type="statement_terminator"
     ),
@@ -293,7 +579,7 @@ mysql_dialect.replace(
 mysql_dialect.insert_lexer_matchers(
     [
         RegexLexer(
-            "atsign",
+            "at_sign",
             r"[@][a-zA-Z0-9_]*",
             CodeSegment,
         ),
@@ -302,7 +588,6 @@ mysql_dialect.insert_lexer_matchers(
 )
 
 
-@mysql_dialect.segment()
 class DeclareStatement(BaseSegment):
     """DECLARE statement.
 
@@ -368,11 +653,11 @@ class DeclareStatement(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
-class StatementSegment(ansi_dialect.get_segment("StatementSegment")):  # type: ignore
+class StatementSegment(ansi.StatementSegment):
     """Overriding StatementSegment to allow for additional segment parsing."""
 
-    parse_grammar = ansi_dialect.get_segment("StatementSegment").parse_grammar.copy(
+    match_grammar = ansi.StatementSegment.match_grammar
+    parse_grammar = ansi.StatementSegment.parse_grammar.copy(
         insert=[
             Ref("DelimiterStatement"),
             Ref("CreateProcedureStatementSegment"),
@@ -391,12 +676,23 @@ class StatementSegment(ansi_dialect.get_segment("StatementSegment")):  # type: i
             Ref("ResignalSegment"),
             Ref("CursorOpenCloseSegment"),
             Ref("CursorFetchSegment"),
+            Ref("DropProcedureStatementSegment"),
             Ref("AlterTableStatementSegment"),
+            Ref("RenameTableStatementSegment"),
+            Ref("ResetMasterStatementSegment"),
+            Ref("PurgeBinaryLogsStatementSegment"),
+            Ref("HelpStatementSegment"),
+            Ref("CheckTableStatementSegment"),
+            Ref("ChecksumTableStatementSegment"),
+            Ref("AnalyzeTableStatementSegment"),
+            Ref("RepairTableStatementSegment"),
+            Ref("OptimizeTableStatementSegment"),
+            Ref("UpsertClauseListSegment"),
+            Ref("InsertRowAliasSegment"),
         ],
     )
 
 
-@mysql_dialect.segment()
 class DelimiterStatement(BaseSegment):
     """DELIMITER statement."""
 
@@ -405,7 +701,6 @@ class DelimiterStatement(BaseSegment):
     match_grammar = Ref.keyword("DELIMITER")
 
 
-@mysql_dialect.segment()
 class CreateProcedureStatementSegment(BaseSegment):
     """A `CREATE PROCEDURE` statement.
 
@@ -426,14 +721,13 @@ class CreateProcedureStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
 class FunctionDefinitionGrammar(BaseSegment):
     """This is the body of a `CREATE FUNCTION` statement."""
 
+    type = "function_definition"
     match_grammar = Ref("TransactionStatementSegment")
 
 
-@mysql_dialect.segment()
 class CharacteristicStatement(BaseSegment):
     """A Characteristics statement for functions/procedures."""
 
@@ -453,7 +747,6 @@ class CharacteristicStatement(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
 class CreateFunctionStatementSegment(BaseSegment):
     """A `CREATE FUNCTION` statement.
 
@@ -478,7 +771,6 @@ class CreateFunctionStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
 class AlterTableStatementSegment(BaseSegment):
     """An `ALTER TABLE .. ALTER COLUMN` statement.
 
@@ -501,7 +793,7 @@ class AlterTableStatementSegment(BaseSegment):
                     Ref("EqualsSegment", optional=True),
                     OneOf(Ref("LiteralGrammar"), Ref("NakedIdentifierSegment")),
                 ),
-                # Add things
+                # Add column
                 Sequence(
                     OneOf("ADD", "MODIFY"),
                     Ref.keyword("COLUMN", optional=True),
@@ -513,6 +805,26 @@ class AlterTableStatementSegment(BaseSegment):
                         # Bracketed Version of the same
                         Ref("BracketedColumnReferenceListGrammar"),
                         optional=True,
+                    ),
+                ),
+                # Add index
+                Sequence(
+                    "ADD",
+                    Ref.keyword("UNIQUE", optional=True),
+                    OneOf("INDEX", "KEY", optional=True),
+                    Ref("IndexReferenceSegment"),
+                    Sequence("USING", OneOf("BTREE", "HASH"), optional=True),
+                    Ref("BracketedColumnReferenceListGrammar"),
+                    AnySetOf(
+                        Sequence(
+                            "KEY_BLOCK_SIZE",
+                            Ref("EqualsSegment"),
+                            Ref("NumericLiteralSegment"),
+                        ),
+                        Sequence("USING", OneOf("BTREE", "HASH")),
+                        Sequence("WITH", "PARSER", Ref("ObjectReferenceSegment")),
+                        Ref("CommentClauseSegment"),
+                        OneOf("VISIBLE", "INVISIBLE"),
                     ),
                 ),
                 # Change column
@@ -534,44 +846,45 @@ class AlterTableStatementSegment(BaseSegment):
                 # Drop column
                 Sequence(
                     "DROP",
-                    Ref.keyword("COLUMN", optional=True),
-                    Ref("ColumnReferenceSegment"),
+                    OneOf(
+                        Sequence(
+                            Ref.keyword("COLUMN", optional=True),
+                            Ref("ColumnReferenceSegment"),
+                        ),
+                        Sequence(
+                            OneOf("INDEX", "KEY", optional=True),
+                            Ref("IndexReferenceSegment"),
+                        ),
+                    ),
                 ),
                 # Rename
                 Sequence(
                     "RENAME",
-                    OneOf("AS", "TO", optional=True),
-                    Ref("TableReferenceSegment"),
+                    OneOf(
+                        # Rename table
+                        Sequence(
+                            OneOf("AS", "TO", optional=True),
+                            Ref("TableReferenceSegment"),
+                        ),
+                        # Rename index
+                        Sequence(
+                            "RENAME",
+                            OneOf("INDEX", "KEY"),
+                            Ref("IndexReferenceSegment"),
+                            "TO",
+                            Ref("IndexReferenceSegment"),
+                        ),
+                    ),
                 ),
             ),
         ),
     )
 
 
-@mysql_dialect.segment(replace=True)
-class DropStatementSegment(BaseSegment):
-    """A `DROP` statement."""
-
-    type = "drop_statement"
-
-    match_grammar = Sequence(
-        "DROP",
-        OneOf(
-            "TABLE",
-            "VIEW",
-            "USER",
-            "FUNCTION",
-            "PROCEDURE",
-        ),
-        Ref("IfExistsGrammar", optional=True),
-        Ref("TableReferenceSegment"),
-    )
-
-
-@mysql_dialect.segment()
 class ProcedureParameterListGrammar(BaseSegment):
     """The parameters for a procedure ie. `(in/out/inout name datatype)`."""
 
+    type = "procedure_parameter_list"
     match_grammar = Bracketed(
         Delimited(
             Ref("ProcedureParameterGrammar"),
@@ -581,7 +894,6 @@ class ProcedureParameterListGrammar(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class SetAssignmentStatementSegment(BaseSegment):
     """A `SET` statement.
 
@@ -598,6 +910,8 @@ class SetAssignmentStatementSegment(BaseSegment):
             Ref("QuotedLiteralSegment"),
             Ref("DoubleQuotedLiteralSegment"),
             Ref("SessionVariableNameSegment"),
+            # Match boolean keywords before local variables.
+            Ref("BooleanDynamicSystemVariablesGrammar"),
             Ref("LocalVariableNameSegment"),
             Ref("FunctionSegment"),
             Ref("ArithmeticBinaryOperatorGrammar"),
@@ -605,7 +919,6 @@ class SetAssignmentStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
 class TransactionStatementSegment(BaseSegment):
     """A `COMMIT`, `ROLLBACK` or `TRANSACTION` statement.
 
@@ -647,7 +960,6 @@ class TransactionStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class IfExpressionStatement(BaseSegment):
     """IF-THEN-ELSE-ELSEIF-END IF statement.
 
@@ -673,7 +985,6 @@ class IfExpressionStatement(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class DefinerSegment(BaseSegment):
     """This is the body of a `CREATE FUNCTION` statement."""
 
@@ -688,7 +999,6 @@ class DefinerSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
 class SelectClauseModifierSegment(BaseSegment):
     """Things that come after SELECT but before the columns."""
 
@@ -707,7 +1017,6 @@ class SelectClauseModifierSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class IntoClauseSegment(BaseSegment):
     """This is an `INTO` clause for assigning variables in a select statement.
 
@@ -771,8 +1080,7 @@ class IntoClauseSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
-class UnorderedSelectStatementSegment(BaseSegment):
+class UnorderedSelectStatementSegment(ansi.UnorderedSelectStatementSegment):
     """A `SELECT` statement without any ORDER clauses or later.
 
     This is designed for use in the context of set operations,
@@ -781,22 +1089,20 @@ class UnorderedSelectStatementSegment(BaseSegment):
     """
 
     type = "select_statement"
-    match_grammar = ansi_dialect.get_segment(
-        "UnorderedSelectStatementSegment"
-    ).match_grammar.copy()
-    match_grammar.terminator = (
-        match_grammar.terminator.copy(
+    match_grammar = ansi.UnorderedSelectStatementSegment.match_grammar.copy()
+    match_grammar.terminator = (  # type: ignore
+        match_grammar.terminator.copy(  # type: ignore
             insert=[Ref("IntoClauseSegment")],
             before=Ref("SetOperatorSegment"),
         )
         .copy(insert=[Ref("ForClauseSegment")])
         .copy(insert=[Ref("IndexHintClauseSegment")])
         .copy(insert=[Ref("SelectPartitionClauseSegment")])
+        .copy(insert=[Ref("UpsertClauseListSegment")])
     )
 
     parse_grammar = (
-        ansi_dialect.get_segment("UnorderedSelectStatementSegment")
-        .parse_grammar.copy(
+        ansi.UnorderedSelectStatementSegment.parse_grammar.copy(
             insert=[Ref("IntoClauseSegment", optional=True)],
             before=Ref("FromClauseSegment", optional=True),
         )
@@ -812,44 +1118,32 @@ class UnorderedSelectStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
-class SelectClauseElementSegment(BaseSegment):
+class SelectClauseElementSegment(ansi.SelectClauseElementSegment):
     """An element in the targets of a select statement."""
 
-    type = "select_clause_element"
-
-    match_grammar = ansi_dialect.get_segment(
-        "SelectClauseElementSegment"
-    ).match_grammar.copy()
-
-    parse_grammar = ansi_dialect.get_segment(
-        "SelectClauseElementSegment"
-    ).parse_grammar.copy()
+    pass
 
 
-@mysql_dialect.segment(replace=True)
-class SelectClauseSegment(BaseSegment):
+class SelectClauseSegment(ansi.SelectClauseSegment):
     """A group of elements in a select target statement."""
 
-    type = "select_clause"
-    match_grammar = ansi_dialect.get_segment("SelectClauseSegment").match_grammar.copy()
-    match_grammar.terminator = match_grammar.terminator.copy(
+    match_grammar = ansi.SelectClauseSegment.match_grammar.copy()
+    match_grammar.terminator = match_grammar.terminator.copy(  # type: ignore
         insert=[Ref("IntoKeywordSegment")]
     )
-    parse_grammar = ansi_dialect.get_segment("SelectClauseSegment").parse_grammar.copy()
+    parse_grammar = ansi.SelectClauseSegment.parse_grammar
 
 
-@mysql_dialect.segment(replace=True)
-class SelectStatementSegment(BaseSegment):
+class SelectStatementSegment(ansi.SelectStatementSegment):
     """A `SELECT` statement.
 
     https://dev.mysql.com/doc/refman/5.7/en/select.html
     """
 
-    type = "select_statement"
-    match_grammar = ansi_dialect.get_segment(
-        "SelectStatementSegment"
-    ).match_grammar.copy()
+    match_grammar = ansi.SelectStatementSegment.match_grammar.copy()
+    match_grammar.terminator = match_grammar.terminator.copy(  # type: ignore
+        insert=[Ref("UpsertClauseListSegment")]
+    )
 
     # Inherit most of the parse grammar from the original.
     parse_grammar = UnorderedSelectStatementSegment.parse_grammar.copy(
@@ -861,7 +1155,6 @@ class SelectStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class ForClauseSegment(BaseSegment):
     """This is the body of a `FOR` clause."""
 
@@ -881,7 +1174,6 @@ class ForClauseSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class IndexHintClauseSegment(BaseSegment):
     """This is the body of an index hint clause."""
 
@@ -902,7 +1194,6 @@ class IndexHintClauseSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class CallStoredProcedureSegment(BaseSegment):
     """This is a CALL statement used to execute a stored procedure.
 
@@ -932,7 +1223,6 @@ class CallStoredProcedureSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class SelectPartitionClauseSegment(BaseSegment):
     """This is the body of a partition clause."""
 
@@ -944,7 +1234,6 @@ class SelectPartitionClauseSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class WhileStatementSegment(BaseSegment):
     """A `WHILE-DO-END WHILE` statement.
 
@@ -975,7 +1264,6 @@ class WhileStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class PrepareSegment(BaseSegment):
     """This is the body of a `PREPARE` statement.
 
@@ -996,7 +1284,6 @@ class PrepareSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class GetDiagnosticsSegment(BaseSegment):
     """This is the body of a `GET DIAGNOSTICS` statement.
 
@@ -1052,7 +1339,6 @@ class GetDiagnosticsSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class LoopStatementSegment(BaseSegment):
     """A `LOOP` statement.
 
@@ -1079,7 +1365,6 @@ class LoopStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class CursorOpenCloseSegment(BaseSegment):
     """This is a CLOSE or Open statement.
 
@@ -1098,7 +1383,6 @@ class CursorOpenCloseSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class IterateStatementSegment(BaseSegment):
     """A `ITERATE` statement.
 
@@ -1113,7 +1397,6 @@ class IterateStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class ExecuteSegment(BaseSegment):
     """This is the body of a `EXECUTE` statement.
 
@@ -1129,7 +1412,6 @@ class ExecuteSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class RepeatStatementSegment(BaseSegment):
     """A `REPEAT-UNTIL` statement.
 
@@ -1160,7 +1442,6 @@ class RepeatStatementSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class DeallocateSegment(BaseSegment):
     """This is the body of a `DEALLOCATE/DROP` statement.
 
@@ -1175,7 +1456,6 @@ class DeallocateSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class ResignalSegment(BaseSegment):
     """This is the body of a `RESIGNAL` statement.
 
@@ -1227,7 +1507,6 @@ class ResignalSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment()
 class CursorFetchSegment(BaseSegment):
     """This is a FETCH statement.
 
@@ -1248,16 +1527,15 @@ class CursorFetchSegment(BaseSegment):
     )
 
 
-@mysql_dialect.segment(replace=True)
-class DropIndexStatementSegment(BaseSegment):
+class DropIndexStatementSegment(ansi.DropIndexStatementSegment):
     """A `DROP INDEX` statement.
 
     https://dev.mysql.com/doc/refman/8.0/en/drop-index.html
     """
 
-    type = "drop_statement"
     # DROP INDEX <Index name> ON <table_name>
-    # [ALGORITHM [=] {DEFAULT | INPLACE | COPY} | LOCK [=] {DEFAULT | NONE | SHARED | EXCLUSIVE}]
+    # [ALGORITHM [=] {DEFAULT | INPLACE | COPY} | LOCK [=] {DEFAULT | NONE | SHARED |
+    # EXCLUSIVE}]
     match_grammar = Sequence(
         "DROP",
         "INDEX",
@@ -1277,4 +1555,274 @@ class DropIndexStatementSegment(BaseSegment):
             ),
             optional=True,
         ),
+    )
+
+
+class DropProcedureStatementSegment(BaseSegment):
+    """A `DROP` statement that addresses stored procedures and functions.
+
+    https://dev.mysql.com/doc/refman/8.0/en/drop-procedure.html
+    """
+
+    type = "drop_procedure_statement"
+
+    # DROP {PROCEDURE | FUNCTION} [IF EXISTS] sp_name
+    match_grammar = Sequence(
+        "DROP",
+        OneOf("PROCEDURE", "FUNCTION"),
+        Ref("IfExistsGrammar", optional=True),
+        Ref("ObjectReferenceSegment"),
+    )
+
+
+class DropFunctionStatementSegment(BaseSegment):
+    """A `DROP` statement that addresses loadable functions.
+
+    https://dev.mysql.com/doc/refman/8.0/en/drop-function-loadable.html
+    """
+
+    type = "drop_function_statement"
+
+    # DROP FUNCTION [IF EXISTS] function_name
+    match_grammar = Sequence(
+        "DROP",
+        "FUNCTION",
+        Ref("IfExistsGrammar", optional=True),
+        Ref("FunctionNameSegment"),
+    )
+
+
+class RenameTableStatementSegment(BaseSegment):
+    """A `RENAME TABLE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/rename-table.html
+    """
+
+    type = "rename_table_statement"
+    match_grammar = Sequence(
+        "RENAME",
+        "TABLE",
+        Delimited(
+            Sequence(
+                Ref("TableReferenceSegment"),
+                "TO",
+                Ref("TableReferenceSegment"),
+            ),
+        ),
+    )
+
+
+class ResetMasterStatementSegment(BaseSegment):
+    """A `RESET MASTER` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/reset-master.html
+    """
+
+    type = "reset_master_statement"
+    match_grammar = Sequence(
+        "RESET",
+        "MASTER",
+        Sequence("TO", Ref("NumericLiteralSegment"), optional=True),
+    )
+
+
+class PurgeBinaryLogsStatementSegment(BaseSegment):
+    """A `PURGE BINARY LOGS` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/purge-binary-logs.html
+    """
+
+    type = "purge_binary_logs_statement"
+    match_grammar = Sequence(
+        "PURGE",
+        OneOf(
+            "BINARY",
+            "MASTER",
+        ),
+        "LOGS",
+        OneOf(
+            Sequence(
+                "TO",
+                Ref("QuotedLiteralSegment"),
+            ),
+            Sequence(
+                "BEFORE",
+                OneOf(
+                    Ref("DateTimeLiteralGrammar"),
+                ),
+            ),
+        ),
+    )
+
+
+class HelpStatementSegment(BaseSegment):
+    """A `HELP` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/help.html
+    """
+
+    type = "help_statement"
+    match_grammar = Sequence(
+        "HELP",
+        Ref("QuotedLiteralSegment"),
+    )
+
+
+class CheckTableStatementSegment(BaseSegment):
+    """A `CHECK TABLE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/check-table.html
+    """
+
+    type = "check_table_statement"
+    match_grammar = Sequence(
+        "CHECK",
+        "TABLE",
+        Delimited(
+            Ref("TableReferenceSegment"),
+        ),
+        AnyNumberOf(
+            Sequence("FOR", "UPGRADE"),
+            "QUICK",
+            "FAST",
+            "MEDIUM",
+            "EXTENDED",
+            "CHANGED",
+            min_times=1,
+        ),
+    )
+
+
+class ChecksumTableStatementSegment(BaseSegment):
+    """A `CHECKSUM TABLE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/checksum-table.html
+    """
+
+    type = "checksum_table_statement"
+    match_grammar = Sequence(
+        "CHECKSUM",
+        "TABLE",
+        Delimited(
+            Ref("TableReferenceSegment"),
+        ),
+        OneOf(
+            "QUICK",
+            "EXTENDED",
+        ),
+    )
+
+
+class AnalyzeTableStatementSegment(BaseSegment):
+    """An `ANALYZE TABLE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/analyze-table.html
+    """
+
+    type = "analyze_table_statement"
+    match_grammar = Sequence(
+        "ANALYZE",
+        OneOf(
+            "NO_WRITE_TO_BINLOG",
+            "LOCAL",
+            optional=True,
+        ),
+        "TABLE",
+        OneOf(
+            Sequence(
+                Delimited(
+                    Ref("TableReferenceSegment"),
+                ),
+            ),
+            Sequence(
+                Ref("TableReferenceSegment"),
+                "UPDATE",
+                "HISTOGRAM",
+                "ON",
+                Delimited(
+                    Ref("ColumnReferenceSegment"),
+                ),
+                Sequence(
+                    "WITH",
+                    Ref("NumericLiteralSegment"),
+                    "BUCKETS",
+                    optional=True,
+                ),
+            ),
+            Sequence(
+                Ref("TableReferenceSegment"),
+                "DROP",
+                "HISTOGRAM",
+                "ON",
+                Delimited(
+                    Ref("ColumnReferenceSegment"),
+                ),
+            ),
+        ),
+    )
+
+
+class RepairTableStatementSegment(BaseSegment):
+    """A `REPAIR TABLE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/repair-table.html
+    """
+
+    type = "repair_table_statement"
+    match_grammar = Sequence(
+        "REPAIR",
+        OneOf(
+            "NO_WRITE_TO_BINLOG",
+            "LOCAL",
+            optional=True,
+        ),
+        "TABLE",
+        Delimited(
+            Ref("TableReferenceSegment"),
+        ),
+        AnyNumberOf(
+            "QUICK",
+            "EXTENDED",
+            "USE_FRM",
+        ),
+    )
+
+
+class OptimizeTableStatementSegment(BaseSegment):
+    """An `OPTIMIZE TABLE` statement.
+
+    https://dev.mysql.com/doc/refman/8.0/en/optimize-table.html
+    """
+
+    type = "optimize_table_statement"
+    match_grammar = Sequence(
+        "OPTIMIZE",
+        OneOf(
+            "NO_WRITE_TO_BINLOG",
+            "LOCAL",
+            optional=True,
+        ),
+        "TABLE",
+        Delimited(
+            Ref("TableReferenceSegment"),
+        ),
+    )
+
+
+class UpdateStatementSegment(BaseSegment):
+    """An `Update` statement.
+
+    As per https://dev.mysql.com/doc/refman/8.0/en/update.html
+    """
+
+    type = "update_statement"
+    match_grammar: Matchable = Sequence(
+        "UPDATE",
+        Ref.keyword("LOW_PRIORITY", optional=True),
+        Ref.keyword("IGNORE", optional=True),
+        Delimited(Ref("TableReferenceSegment"), Ref("FromExpressionSegment")),
+        Ref("SetClauseListSegment"),
+        Ref("WhereClauseSegment", optional=True),
+        Ref("OrderByClauseSegment", optional=True),
+        Ref("LimitClauseSegment", optional=True),
     )

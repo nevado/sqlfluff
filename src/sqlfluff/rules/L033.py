@@ -8,26 +8,33 @@ from sqlfluff.core.rules.base import BaseRule, LintFix, LintResult, RuleContext
 
 
 class Rule_L033(BaseRule):
-    """UNION [DISTINCT|ALL] is preferred over just UNION.
+    """``UNION [DISTINCT|ALL]`` is preferred over just ``UNION``.
 
-    NB: This rule is only enabled for dialects that support UNION DISTINCT
-    (`ansi`, `bigquery`, `hive`, and `mysql`).
+    .. note::
+       This rule is only enabled for dialects that support ``UNION`` and
+       ``UNION DISTINCT`` (``ansi``, ``hive``, ``mysql``, and ``redshift``).
 
-    | **Anti-pattern**
-    | In this example, UNION DISTINCT should be preferred over UNION, because
-    | explicit is better than implicit.
+    **Anti-pattern**
 
-    .. code-block:: sql
-
-        SELECT a, b FROM table_1 UNION SELECT a, b FROM table_2
-
-    | **Best practice**
-    | Specify DISTINCT or ALL after UNION. (Note that DISTINCT is the default
-    | behavior.
+    In this example, ``UNION DISTINCT`` should be preferred over ``UNION``, because
+    explicit is better than implicit.
 
     .. code-block:: sql
 
-        SELECT a, b FROM table_1 UNION DISTINCT SELECT a, b FROM table_2
+        SELECT a, b FROM table_1
+        UNION
+        SELECT a, b FROM table_2
+
+    **Best practice**
+
+    Specify ``DISTINCT`` or ``ALL`` after ``UNION`` (note that ``DISTINCT`` is the
+    default behavior).
+
+    .. code-block:: sql
+
+        SELECT a, b FROM table_1
+        UNION DISTINCT
+        SELECT a, b FROM table_2
 
     """
 
@@ -41,7 +48,12 @@ class Rule_L033(BaseRule):
         Note only some dialects have concept of UNION DISTINCT, so rule is only
         applied to dialects that are known to support this syntax.
         """
-        if context.dialect.name not in ["ansi", "bigquery", "hive", "mysql"]:
+        if context.dialect.name not in [
+            "ansi",
+            "hive",
+            "mysql",
+            "redshift",
+        ]:
             return LintResult()
 
         if context.segment.is_type("set_operator"):
@@ -52,8 +64,7 @@ class Rule_L033(BaseRule):
                 return LintResult(
                     anchor=context.segment,
                     fixes=[
-                        LintFix(
-                            "edit",
+                        LintFix.replace(
                             context.segment.segments[0],
                             [
                                 KeywordSegment("union"),
@@ -70,8 +81,7 @@ class Rule_L033(BaseRule):
                 return LintResult(
                     anchor=context.segment,
                     fixes=[
-                        LintFix(
-                            "edit",
+                        LintFix.replace(
                             context.segment.segments[0],
                             [
                                 KeywordSegment("UNION"),

@@ -1,5 +1,6 @@
 SELECT timestamp with time zone '2005-04-02 12:00:00-07' + interval '1 day';
 
+-- DATEADD is not a function in postgres so this should parse day as column name
 SELECT DATEADD(day, -2, current_date);
 
 SELECT timestamptz '2013-07-01 12:00:00' - timestamptz '2013-03-01 12:00:00';
@@ -39,3 +40,12 @@ SELECT time without time zone '00:00:00' AT TIME ZONE 'Africa/Cairo';
 SELECT c_timestamp AT TIME ZONE 'Africa/Cairo' FROM t_table;
 
 SELECT (c_timestamp AT TIME ZONE 'Africa/Cairo')::time FROM t_table;
+
+SELECT a::double precision FROM my_table;
+
+
+SELECT
+    schema1.table1.columna,
+    t.col2
+FROM schema1.table1
+CROSS JOIN LATERAL somefunc(tb.columnb) as t(col1 text, col2 bool);

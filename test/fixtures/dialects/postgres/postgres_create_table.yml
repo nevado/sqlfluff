@@ -3,7 +3,7 @@
 # computed by SQLFluff when running the tests. Please run
 # `python test/generate_parse_fixture_yml.py`  to generate them after adding or
 # altering SQL files.
-_hash: 463feff7c6b4deebbfc0bdd82d953eb4544d40a5e359724a4c64a6631ad6c37a
+_hash: 1ce86226be391d0503f1a45ce8367faeb5628f17a241abc85aa0af4e308ef3f9
 file:
 - statement:
     create_table_statement:
@@ -32,7 +32,7 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - column_constraint_segment:
         - keyword: PRIMARY
         - keyword: KEY
@@ -46,11 +46,10 @@ file:
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - column_constraint_segment:
         - keyword: NOT
@@ -62,7 +61,9 @@ file:
             expression:
               column_reference:
                 identifier: name
-              comparison_operator: <>
+              comparison_operator:
+              - raw_comparison_operator: <
+              - raw_comparison_operator: '>'
               literal: "''"
             end_bracket: )
       - end_bracket: )
@@ -78,7 +79,7 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - column_constraint_segment:
           keyword: CHECK
           bracketed:
@@ -86,18 +87,18 @@ file:
             expression:
               column_reference:
                 identifier: did
-              comparison_operator: '>'
+              comparison_operator:
+                raw_comparison_operator: '>'
               literal: '100'
             end_bracket: )
       - comma: ','
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - end_bracket: )
 - statement_terminator: ;
@@ -112,19 +113,18 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - comma: ','
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - comma: ','
-      - table_constraint_segment:
+      - table_constraint:
         - keyword: CONSTRAINT
         - object_reference:
             identifier: con1
@@ -134,12 +134,15 @@ file:
             expression:
             - column_reference:
                 identifier: did
-            - comparison_operator: '>'
+            - comparison_operator:
+                raw_comparison_operator: '>'
             - literal: '100'
             - binary_operator: AND
             - column_reference:
                 identifier: name
-            - comparison_operator: <>
+            - comparison_operator:
+              - raw_comparison_operator: <
+              - raw_comparison_operator: '>'
             - literal: "''"
             end_bracket: )
       - end_bracket: )
@@ -155,19 +158,18 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - comma: ','
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - comma: ','
-      - table_constraint_segment:
+      - table_constraint:
         - keyword: PRIMARY
         - keyword: KEY
         - bracketed:
@@ -188,7 +190,7 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - column_constraint_segment:
         - keyword: PRIMARY
         - keyword: KEY
@@ -196,11 +198,10 @@ file:
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - end_bracket: )
 - statement_terminator: ;
@@ -215,11 +216,10 @@ file:
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - column_constraint_segment:
           keyword: DEFAULT
@@ -228,7 +228,7 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - column_constraint_segment:
           keyword: DEFAULT
           function:
@@ -261,7 +261,7 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - column_constraint_segment:
         - keyword: CONSTRAINT
         - object_reference:
@@ -272,11 +272,10 @@ file:
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - column_constraint_segment:
         - keyword: NOT
@@ -294,16 +293,15 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - comma: ','
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - column_constraint_segment:
           keyword: UNIQUE
@@ -320,19 +318,18 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - comma: ','
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - comma: ','
-      - table_constraint_segment:
+      - table_constraint:
           keyword: UNIQUE
           bracketed:
             start_bracket: (
@@ -352,19 +349,18 @@ file:
       - column_reference:
           identifier: did
       - data_type:
-          data_type_identifier: integer
+          keyword: integer
       - comma: ','
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: varchar
+          keyword: varchar
           bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
       - comma: ','
-      - table_constraint_segment:
+      - table_constraint:
           keyword: UNIQUE
           bracketed:
             start_bracket: (
@@ -376,7 +372,8 @@ file:
             bracketed:
               start_bracket: (
               parameter: fillfactor
-              comparison_operator: '='
+              comparison_operator:
+                raw_comparison_operator: '='
               literal: '70'
               end_bracket: )
       - end_bracket: )
@@ -384,7 +381,8 @@ file:
     - bracketed:
         start_bracket: (
         parameter: fillfactor
-        comparison_operator: '='
+        comparison_operator:
+          raw_comparison_operator: '='
         literal: '70'
         end_bracket: )
 - statement_terminator: ;
@@ -399,20 +397,20 @@ file:
       - column_reference:
           identifier: id
       - data_type:
-          data_type_identifier: serial
+          keyword: serial
       - comma: ','
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: text
+          keyword: text
       - comma: ','
       - column_reference:
           identifier: location
       - data_type:
-          data_type_identifier: text
+          keyword: text
       - end_bracket: )
     - keyword: TABLESPACE
-    - table_reference:
+    - tablespace_reference:
         identifier: diskvol1
 - statement_terminator: ;
 - statement:
@@ -441,7 +439,7 @@ file:
     - parameter: employee_type
     - bracketed:
       - start_bracket: (
-      - table_constraint_segment:
+      - table_constraint:
         - keyword: PRIMARY
         - keyword: KEY
         - bracketed:
@@ -479,12 +477,12 @@ file:
       - column_reference:
           identifier: peaktemp
       - data_type:
-          data_type_identifier: int
+          keyword: int
       - comma: ','
       - column_reference:
           identifier: unitsales
       - data_type:
-          data_type_identifier: int
+          keyword: int
       - end_bracket: )
     - keyword: PARTITION
     - keyword: BY
@@ -515,12 +513,12 @@ file:
       - column_reference:
           identifier: peaktemp
       - data_type:
-          data_type_identifier: int
+          keyword: int
       - comma: ','
       - column_reference:
           identifier: unitsales
       - data_type:
-          data_type_identifier: int
+          keyword: int
       - end_bracket: )
     - keyword: PARTITION
     - keyword: BY
@@ -563,7 +561,7 @@ file:
       - column_reference:
           identifier: city_id
       - data_type:
-          data_type_identifier: bigserial
+          keyword: bigserial
       - column_constraint_segment:
         - keyword: not
         - keyword: 'null'
@@ -571,7 +569,7 @@ file:
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: text
+          keyword: text
       - column_constraint_segment:
         - keyword: not
         - keyword: 'null'
@@ -579,7 +577,7 @@ file:
       - column_reference:
           identifier: population
       - data_type:
-          data_type_identifier: bigint
+          keyword: bigint
       - end_bracket: )
     - keyword: PARTITION
     - keyword: BY
@@ -618,7 +616,7 @@ file:
       - column_reference:
           identifier: order_id
       - data_type:
-          data_type_identifier: bigint
+          keyword: bigint
       - column_constraint_segment:
         - keyword: not
         - keyword: 'null'
@@ -626,7 +624,7 @@ file:
       - column_reference:
           identifier: cust_id
       - data_type:
-          data_type_identifier: bigint
+          keyword: bigint
       - column_constraint_segment:
         - keyword: not
         - keyword: 'null'
@@ -634,7 +632,7 @@ file:
       - column_reference:
           identifier: status
       - data_type:
-          data_type_identifier: text
+          keyword: text
       - end_bracket: )
     - keyword: PARTITION
     - keyword: BY
@@ -665,7 +663,7 @@ file:
         end_bracket: )
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
       - keyword: FROM
       - bracketed:
           start_bracket: (
@@ -691,7 +689,7 @@ file:
         identifier: measurement_year_month
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
       - keyword: FROM
       - bracketed:
         - start_bracket: (
@@ -725,7 +723,7 @@ file:
         identifier: measurement_year_month
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
       - keyword: FROM
       - bracketed:
         - start_bracket: (
@@ -757,7 +755,7 @@ file:
         identifier: measurement_year_month
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
       - keyword: FROM
       - bracketed:
         - start_bracket: (
@@ -789,7 +787,7 @@ file:
         identifier: measurement_year_month
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
       - keyword: FROM
       - bracketed:
         - start_bracket: (
@@ -821,7 +819,7 @@ file:
         identifier: cities
     - bracketed:
         start_bracket: (
-        table_constraint_segment:
+        table_constraint:
         - keyword: CONSTRAINT
         - object_reference:
             identifier: city_id_nonzero
@@ -831,13 +829,15 @@ file:
             expression:
               column_reference:
                 identifier: city_id
-              comparison_operator: '!='
+              comparison_operator:
+              - raw_comparison_operator: '!'
+              - raw_comparison_operator: '='
               literal: '0'
             end_bracket: )
         end_bracket: )
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
         keyword: IN
         bracketed:
         - start_bracket: (
@@ -860,7 +860,7 @@ file:
         identifier: cities
     - bracketed:
         start_bracket: (
-        table_constraint_segment:
+        table_constraint:
         - keyword: CONSTRAINT
         - object_reference:
             identifier: city_id_nonzero
@@ -870,13 +870,15 @@ file:
             expression:
               column_reference:
                 identifier: city_id
-              comparison_operator: '!='
+              comparison_operator:
+              - raw_comparison_operator: '!'
+              - raw_comparison_operator: '='
               literal: '0'
             end_bracket: )
         end_bracket: )
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
         keyword: IN
         bracketed:
         - start_bracket: (
@@ -907,7 +909,7 @@ file:
         identifier: cities_ab
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
       - keyword: FROM
       - bracketed:
           start_bracket: (
@@ -933,7 +935,7 @@ file:
         identifier: orders
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
         keyword: WITH
         bracketed:
         - start_bracket: (
@@ -956,7 +958,7 @@ file:
         identifier: orders
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
         keyword: WITH
         bracketed:
         - start_bracket: (
@@ -979,7 +981,7 @@ file:
         identifier: orders
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
         keyword: WITH
         bracketed:
         - start_bracket: (
@@ -1002,7 +1004,7 @@ file:
         identifier: orders
     - keyword: FOR
     - keyword: VALUES
-    - base:
+    - partition_bound_spec:
         keyword: WITH
         bracketed:
         - start_bracket: (
@@ -1037,7 +1039,7 @@ file:
       - column_reference:
           identifier: event_type
       - data_type:
-          data_type_identifier: INTEGER
+          keyword: INTEGER
       - comma: ','
       - column_reference:
           identifier: event_time
@@ -1048,12 +1050,12 @@ file:
       - column_reference:
           identifier: user_email
       - data_type:
-          data_type_identifier: VARCHAR
+          keyword: VARCHAR
       - comma: ','
       - column_reference:
           identifier: phone_number
       - data_type:
-          data_type_identifier: VARCHAR
+          keyword: VARCHAR
       - comma: ','
       - column_reference:
           identifier: processing_date
@@ -1061,7 +1063,7 @@ file:
           datetime_type_identifier:
             keyword: DATE
       - comma: ','
-      - table_constraint_segment:
+      - table_constraint:
         - keyword: PRIMARY
         - keyword: KEY
         - bracketed:
@@ -1094,7 +1096,7 @@ file:
       - column_reference:
           identifier: city_id
       - data_type:
-          data_type_identifier: int
+          keyword: int
       - column_constraint_segment:
         - keyword: NOT
         - keyword: 'NULL'
@@ -1111,12 +1113,12 @@ file:
       - column_reference:
           identifier: peaktemp
       - data_type:
-          data_type_identifier: int
+          keyword: int
       - comma: ','
       - column_reference:
           identifier: unitsales
       - data_type:
-          data_type_identifier: int
+          keyword: int
       - end_bracket: )
     - keyword: PARTITION
     - keyword: BY
@@ -1140,7 +1142,7 @@ file:
       - column_reference:
           identifier: id
       - data_type:
-          data_type_identifier: serial
+          keyword: serial
       - column_constraint_segment:
         - keyword: NOT
         - keyword: 'NULL'
@@ -1148,7 +1150,7 @@ file:
       - column_reference:
           identifier: name
       - data_type:
-          data_type_identifier: text
+          keyword: text
       - column_constraint_segment:
         - keyword: NOT
         - keyword: 'NULL'
@@ -1156,14 +1158,14 @@ file:
       - column_reference:
           identifier: group_name
       - data_type:
-          data_type_identifier: text
+          keyword: text
       - column_constraint_segment:
           keyword: 'NULL'
       - comma: ','
       - column_reference:
           identifier: cluster_id
       - data_type:
-          data_type_identifier: int8
+          keyword: int8
       - column_constraint_segment:
           keyword: 'NULL'
       - comma: ','
@@ -1194,7 +1196,7 @@ file:
       - column_reference:
           identifier: operation_id
       - data_type:
-          data_type_identifier: int4
+          keyword: int4
       - column_constraint_segment:
         - keyword: NOT
         - keyword: 'NULL'
@@ -1205,7 +1207,7 @@ file:
             cast_expression:
               casting_operator: '::'
               data_type:
-                data_type_identifier: integer
+                keyword: integer
       - end_bracket: )
 - statement_terminator: ;
 - statement:
@@ -1217,21 +1219,26 @@ file:
       - dot: .
       - identifier: test_table
     - bracketed:
-        start_bracket: (
-        column_reference:
+      - start_bracket: (
+      - column_reference:
           identifier: '"col1"'
-        data_type:
+      - data_type:
         - keyword: character
         - keyword: varying
         - bracketed:
             start_bracket: (
-            expression:
-              literal: '40'
+            literal: '40'
             end_bracket: )
-        column_constraint_segment:
+      - column_constraint_segment:
         - keyword: NOT
         - keyword: 'NULL'
-        end_bracket: )
+      - comma: ','
+      - column_reference:
+          identifier: '"col2"'
+      - data_type:
+        - keyword: double
+        - keyword: precision
+      - end_bracket: )
 - statement_terminator: ;
 - statement:
     create_table_statement:
@@ -1244,7 +1251,7 @@ file:
       - column_reference:
           identifier: group_id
       - data_type:
-          data_type_identifier: INTEGER
+          keyword: INTEGER
       - column_constraint_segment:
         - keyword: PRIMARY
         - keyword: KEY
@@ -1267,7 +1274,7 @@ file:
       - column_reference:
           identifier: user_id
       - data_type:
-          data_type_identifier: INTEGER
+          keyword: INTEGER
       - column_constraint_segment:
         - keyword: PRIMARY
         - keyword: KEY
@@ -1281,10 +1288,10 @@ file:
       - column_reference:
           identifier: group_id
       - data_type:
-          data_type_identifier: INTEGER
+          keyword: INTEGER
       - column_constraint_segment:
         - keyword: REFERENCES
-        - column_reference:
+        - table_reference:
             identifier: groups
         - bracketed:
             start_bracket: (
@@ -1293,16 +1300,15 @@ file:
             end_bracket: )
         - keyword: 'ON'
         - keyword: DELETE
-        - referential_action:
-            keyword: CASCADE
+        - keyword: CASCADE
       - comma: ','
       - column_reference:
           identifier: domain_id
       - data_type:
-          data_type_identifier: INTEGER
+          keyword: INTEGER
       - column_constraint_segment:
         - keyword: REFERENCES
-        - column_reference:
+        - table_reference:
             identifier: groups
         - bracketed:
             start_bracket: (
@@ -1311,7 +1317,22 @@ file:
             end_bracket: )
         - keyword: 'ON'
         - keyword: UPDATE
-        - referential_action:
-            keyword: RESTRICT
+        - keyword: RESTRICT
+      - comma: ','
+      - column_reference:
+          identifier: other_id
+      - data_type:
+          keyword: INTEGER
+      - column_constraint_segment:
+        - keyword: REFERENCES
+        - table_reference:
+            identifier: groups
+        - bracketed:
+            start_bracket: (
+            column_reference:
+              identifier: group_id
+            end_bracket: )
+        - keyword: MATCH
+        - keyword: SIMPLE
       - end_bracket: )
 - statement_terminator: ;

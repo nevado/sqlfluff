@@ -2,7 +2,7 @@
 from typing import List, NamedTuple, Optional
 
 from sqlfluff.core.dialects.base import Dialect
-from sqlfluff.core.dialects.common import AliasInfo
+from sqlfluff.core.dialects.common import AliasInfo, ColumnAliasInfo
 from sqlfluff.core.parser.segments.base import BaseSegment
 
 
@@ -14,7 +14,7 @@ class SelectStatementColumnsAndTables(NamedTuple):
     standalone_aliases: List[str]
     reference_buffer: List[BaseSegment]
     select_targets: List[BaseSegment]
-    col_aliases: List[str]
+    col_aliases: List[ColumnAliasInfo]
     using_cols: List[str]
 
 
@@ -30,26 +30,20 @@ def get_select_statement_info(
     # Iterate through all the references, both in the select clause, but also
     # potential others.
     sc = segment.get_child("select_clause")
+    # Sometimes there is no select clause (e.g. "SELECT *" is a select_clause_element)
+    if not sc:
+        return None
     reference_buffer = list(sc.recursive_crawl("object_reference"))
-    # Add any wildcard references
-    reference_buffer += list(sc.recursive_crawl("wildcard_identifier"))
     for potential_clause in (
         "where_clause",
         "groupby_clause",
         "having_clause",
         "orderby_clause",
+        "qualify_clause",
     ):
         clause = segment.get_child(potential_clause)
         if clause:
             reference_buffer += list(clause.recursive_crawl("object_reference"))
-    # PURGE any references which are in nested select statements
-    for ref in reference_buffer.copy():
-        ref_path = segment.path_to(ref)
-        # is it in a subselect? i.e. a select which isn't this one.
-        if any(
-            seg.is_type("select_statement") and seg is not segment for seg in ref_path
-        ):
-            reference_buffer.remove(ref)
 
     # Get all select targets.
     select_targets = segment.get_child("select_clause").get_children(
@@ -57,11 +51,7 @@ def get_select_statement_info(
     )
 
     # Get all column aliases
-    col_aliases = []
-    for col_seg in list(sc.recursive_crawl("alias_expression")):
-        for seg in col_seg.segments:
-            if seg.is_type("identifier"):
-                col_aliases.append(seg.raw)
+    col_aliases = [s.get_alias() for s in select_targets if s.get_alias() is not None]
 
     # Get any columns referred to in a using clause, and extract anything
     # from ON clauses.
@@ -75,7 +65,7 @@ def get_select_statement_info(
                     seen_using = True
                 elif seg.is_type("join_on_condition"):
                     for on_seg in seg.segments:
-                        if on_seg.is_type("expression"):
+                        if on_seg.is_type("bracketed", "expression"):
                             # Deal with expressions
                             reference_buffer += list(
                                 seg.recursive_crawl("object_reference")
@@ -85,6 +75,15 @@ def get_select_statement_info(
                         if subseg.is_type("identifier"):
                             using_cols.append(subseg.raw)
                     seen_using = False
+
+    # PURGE any references which are in nested select statements
+    for ref in reference_buffer.copy():
+        ref_path = segment.path_to(ref)
+        # is it in a subselect? i.e. a select which isn't this one.
+        if ref_path and any(
+            seg.is_type("select_statement") and seg is not segment for seg in ref_path
+        ):
+            reference_buffer.remove(ref)
 
     return SelectStatementColumnsAndTables(
         select_statement=segment,
@@ -129,10 +128,11 @@ def _has_value_table_function(table_expr, dialect):
         # We need the dialect to get the value table function names. If
         # we don't have it, assume the clause does not have a value table
         # function.
-        return False
+        return False  # pragma: no cover
 
     for function_name in table_expr.recursive_crawl("function_name"):
-        # Other rules can increase whitespace in the function name, so use strip to remove
+        # Other rules can increase whitespace in the function name, so use strip to
+        # remove
         # See: https://github.com/sqlfluff/sqlfluff/issues/1304
         if function_name.raw.lower().strip() in dialect.sets("value_table_functions"):
             return True
@@ -143,7 +143,7 @@ def _get_pivot_table_columns(segment, dialect):
     if not dialect:
         # We need the dialect to get the pivot table column names. If
         # we don't have it, assume the clause does not have a pivot table
-        return []
+        return []  # pragma: no cover
 
     fc = segment.get_child("from_pivot_expression")
     if not fc:
