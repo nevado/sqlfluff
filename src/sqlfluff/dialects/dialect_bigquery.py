@@ -157,12 +157,6 @@ bigquery_dialect.add(
             Ref("BaseExpressionElementGrammar"),
         ),
     ),
-    ExtractFunctionName=StringParser(
-        "EXTRACT",
-        SymbolSegment,
-        name="function_name_identifier",
-        type="function_name_identifier",
-    ),
 )
 
 
@@ -435,12 +429,41 @@ bigquery_dialect.replace(
 class ExtractFunctionNameSegment(BaseSegment):
     """EXTRACT function name segment.
 
-    Need to be able to specify this as type function_name
-    so that linting rules identify it properly
+    Need to be able to specify this as type `function_name_identifier`
+    within a `function_name` so that linting rules identify it properly.
     """
 
     type = "function_name"
-    match_grammar: Matchable = Ref("ExtractFunctionName")
+    match_grammar: Matchable = StringParser(
+        "EXTRACT",
+        CodeSegment,
+        name="function_name_identifier",
+        type="function_name_identifier",
+    )
+
+
+class NormalizeFunctionNameSegment(BaseSegment):
+    """NORMALIZE function name segment.
+
+    Need to be able to specify this as type `function_name_identifier`
+    within a `function_name` so that linting rules identify it properly.
+    """
+
+    type = "function_name"
+    match_grammar: Matchable = OneOf(
+        StringParser(
+            "NORMALIZE",
+            CodeSegment,
+            name="function_name_identifier",
+            type="function_name_identifier",
+        ),
+        StringParser(
+            "NORMALIZE_AND_CASEFOLD",
+            CodeSegment,
+            name="function_name_identifier",
+            type="function_name_identifier",
+        ),
+    )
 
 
 class FunctionSegment(ansi.FunctionSegment):
@@ -465,7 +488,19 @@ class FunctionSegment(ansi.FunctionSegment):
                     Ref("DatetimeUnitSegment"),
                     "FROM",
                     Ref("ExpressionSegment"),
-                    Ref("TimeZoneGrammar", optional=True),
+                ),
+            ),
+            Sequence(
+                # BigQuery NORMALIZE allows optional normalization_mode
+                # https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#normalize
+                Ref("NormalizeFunctionNameSegment"),
+                Bracketed(
+                    Ref("ExpressionSegment"),
+                    Sequence(
+                        Ref("CommaSegment"),
+                        OneOf("NFC", "NFKC", "NFD", "NFKD"),
+                        optional=True,
+                    ),
                 ),
             ),
             Sequence(
@@ -492,6 +527,7 @@ class FunctionSegment(ansi.FunctionSegment):
                         "FunctionNameSegment",
                         exclude=OneOf(
                             Ref("DatePartFunctionNameSegment"),
+                            Ref("NormalizeFunctionNameSegment"),
                             Ref("ValuesClauseSegment"),
                         ),
                     ),
