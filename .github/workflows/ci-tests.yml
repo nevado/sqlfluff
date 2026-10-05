@@ -3,7 +3,6 @@
 #############################
 #
 # This can be kicked off manually in the Actions tab of GitHub
-# It will also run nightly at 2pm
 # It will run on any pull request, except non-code changes
 # (images, markdown files, )
 #
@@ -11,9 +10,6 @@ name: CI
 
 on:
   workflow_dispatch:
-  schedule:
-    # 2am each night
-    - cron: '00 2 * * *'
   # Don't use pull_request_target here. See:
   # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
   pull_request:
